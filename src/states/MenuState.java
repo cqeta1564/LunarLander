@@ -1,64 +1,48 @@
 package states;
 
 import input.InputHandler;
-// import graphics.Renderer;
 import java.awt.Graphics2D;
-import java.awt.Color; // Jen pro příklad
-import java.awt.Font;  // Jen pro příklad
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.event.KeyEvent; // Potřebujeme pro consumeKey
 
 public class MenuState implements GameState {
 
     private StateManager stateManager;
     private InputHandler inputHandler;
 
-    // Příklad: tlačítka
-    // private ui.Button playButton;
-    // private ui.Button settingsButton;
-    // private ui.Button exitButton;
-    // int selectedOption = 0;
-
+    private boolean processedSPress = false; // Pro jednorázový stisk 'S'
+    private boolean processedEnterPress = false; // Pro jednorázový stisk 'Enter'
 
     public MenuState(StateManager stateManager, InputHandler inputHandler) {
         this.stateManager = stateManager;
         this.inputHandler = inputHandler;
-        init(stateManager);
     }
 
     @Override
     public void init(StateManager stateManager) {
-        // Inicializace tlačítek, načtení obrázků pro menu atd.
-        // playButton = new ui.Button("Start Game", 200, 200, ...);
-        System.out.println("MenuState initialized.");
+        // System.out.println("MenuState initialized.");
     }
 
     @Override
     public void update(double deltaTime) {
-        handleInput(); // Zpracování vstupu specifického pro menu
-        // Aktualizace animací v menu, efektů na tlačítkách atd.
-
-        // Příklad logiky výběru:
-        // if (inputHandler.down && !previousDownState) { selectedOption++; }
-        // if (inputHandler.enter) { /* ... aktivuj vybranou možnost ... */ }
+        handleInput();
     }
 
     @Override
-    public void render(Graphics2D g) { // Dočasně Graphics2D
-        // Vykreslení pozadí menu
+    public void render(Graphics2D g) {
         g.setColor(Color.BLACK);
-        g.fillRect(0, 0, core.Game.DEFAULT_WIDTH, core.Game.DEFAULT_HEIGHT); // Předpokládáme přístup k rozměrům
+        g.fillRect(0, 0, core.Game.DEFAULT_WIDTH, core.Game.DEFAULT_HEIGHT);
 
-        // Vykreslení názvu hry
         g.setColor(Color.YELLOW);
         g.setFont(new Font("Arial", Font.BOLD, 50));
         String title = "Lunar Lander";
         int titleWidth = g.getFontMetrics().stringWidth(title);
         g.drawString(title, (core.Game.DEFAULT_WIDTH - titleWidth) / 2, 150);
 
-        // Vykreslení tlačítek/položek menu
         g.setFont(new Font("Arial", Font.PLAIN, 30));
-        // Příklad:
-        // if (selectedOption == 0) g.setColor(Color.RED); else g.setColor(Color.WHITE);
-        g.setColor(Color.WHITE); // Dočasně vždy bílá
+        g.setColor(Color.WHITE);
+
         String playText = "Spustit hru (Enter)";
         int playTextWidth = g.getFontMetrics().stringWidth(playText);
         g.drawString(playText, (core.Game.DEFAULT_WIDTH - playTextWidth) / 2, 300);
@@ -70,40 +54,57 @@ public class MenuState implements GameState {
         String exitText = "Ukončit (Esc)";
         int exitTextWidth = g.getFontMetrics().stringWidth(exitText);
         g.drawString(exitText, (core.Game.DEFAULT_WIDTH - exitTextWidth) / 2, 400);
-
-        // playButton.render(g);
-        // settingsButton.render(g);
-        // exitButton.render(g);
     }
 
     @Override
     public void handleInput() {
-        // Zde budeme reagovat na stisky kláves pro navigaci v menu
-        if (inputHandler.enter) {
-            // stateManager.setState(StateManager.StateType.PLAYING);
-            System.out.println("Enter stisknut v Menu -> přechod do PlayingState (zatím neimplementováno)");
-            // Prozatím jen výpis, PlayingState ještě nemáme
-            stateManager.setState(StateManager.StateType.PLAYING);
+        // Přechod do hry
+        if (inputHandler.enterPressed) {
+            if(!processedEnterPress){
+                stateManager.setState(StateManager.StateType.PLAYING);
+                // Není třeba volat consumeKey pro Enter, pokud přecházíme do úplně jiného stavu,
+                // kde Enter má jinou funkci nebo žádnou. Ale pro konzistenci můžeme:
+                inputHandler.consumeKey(KeyEvent.VK_ENTER);
+                processedEnterPress = true; // Aby se to nespustilo vícekrát, pokud by stav nepřepnul okamžitě
+            }
+        } else {
+            processedEnterPress = false;
         }
-        if (inputHandler.escape) {
+
+        // Přechod do nastavení
+        if (inputHandler.sPressed) { // Používáme nový příznak sPressed
+            if (!processedSPress) {
+                stateManager.setState(StateManager.StateType.SETTINGS);
+                inputHandler.consumeKey(KeyEvent.VK_S); // "Spotřebovat" stisk S
+                processedSPress = true;
+            }
+        } else {
+            processedSPress = false;
+        }
+
+        // Ukončení hry
+        if (inputHandler.escapePressed) {
             System.out.println("Escape stisknut v Menu -> ukončení hry");
-            System.exit(0); // Jednoduché ukončení
+            // Není třeba consumeKey, protože hra končí
+            System.exit(0);
         }
-        // if (inputHandler.s) { // 'S' pro Settings
-        //     stateManager.setState(StateManager.StateType.SETTINGS);
-        // }
     }
 
     @Override
     public void onEnter() {
         System.out.println("Vstup do MenuState.");
-        // Resetovat stav menu, např. vybranou položku
-        // selectedOption = 0;
+        // Resetovat stav zpracování stisku při vstupu do stavu
+        processedSPress = false;
+        processedEnterPress = false;
+        // Případně "spotřebovat" klávesy, které mohly vést k tomuto stavu, pokud je to nutné
+        inputHandler.consumeKey(KeyEvent.VK_S);
+        inputHandler.consumeKey(KeyEvent.VK_ENTER);
+        // Esc by měl být také spotřebován, pokud se vracíme z jiného stavu pomocí Esc
+        inputHandler.consumeKey(KeyEvent.VK_ESCAPE);
     }
 
     @Override
     public void onExit() {
         System.out.println("Opuštění MenuState.");
-        // Uvolnit zdroje specifické pro menu, pokud je potřeba
     }
 }

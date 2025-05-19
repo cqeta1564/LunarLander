@@ -5,21 +5,19 @@ import input.InputHandler;
 public class StateManager {
 
     public enum StateType {
-        MENU, PLAYING, SETTINGS, GAME_OVER // Další podle potřeby
+        MENU, PLAYING, SETTINGS, GAME_OVER
     }
 
     private GameState currentState;
     private InputHandler inputHandler;
-    // Zde můžeme držet instance všech stavů, pokud je chceme cachovat
+    // Instance stavů pro možné cachování (volitelné)
     // private MenuState menuState;
     // private PlayingState playingState;
-    // ...
+    // private SettingsState settingsState;
 
     public StateManager(InputHandler inputHandler) {
         this.inputHandler = inputHandler;
-        // Inicializovat a nastavit počáteční stav
-        // Např. menuState = new MenuState(this, inputHandler);
-        // setState(StateType.MENU); // Nebo to udělat z Game třídy po inicializaci
+        // Počáteční stav se nastavuje z Game.init()
     }
 
     public void setState(StateType type) {
@@ -27,33 +25,39 @@ public class StateManager {
             currentState.onExit();
         }
 
+        System.out.println("StateManager: Setting state to " + type); // Ladící výpis
+
         switch (type) {
             case MENU:
                 // if (menuState == null) menuState = new MenuState(this, inputHandler);
-                currentState = new MenuState(this, inputHandler); // Nebo získat z cache
+                // currentState = menuState;
+                currentState = new MenuState(this, inputHandler); // Vždy nová instance nebo z cache
                 break;
             case PLAYING:
                 // if (playingState == null) playingState = new PlayingState(this, inputHandler);
-                currentState = new PlayingState(this, inputHandler); // Dočasně, později vytvoříme
+                // currentState = playingState;
+                currentState = new PlayingState(this, inputHandler);
                 break;
-            // case SETTINGS:
-            //     currentState = new SettingsState(this, inputHandler);
-            //     break;
+            case SETTINGS: // <<-- NOVÁ ČÁST
+                // if (settingsState == null) settingsState = new SettingsState(this, inputHandler);
+                // currentState = settingsState;
+                currentState = new SettingsState(this, inputHandler);
+                break;
             default:
                 System.err.println("Neznámý stav: " + type);
-                currentState = null; // Nebo defaultní stav
+                currentState = null;
         }
 
         if (currentState != null) {
-            // currentState.init(); // init() by se mělo volat jednou, možná v konstruktoru stavu
+            // currentState.init(this); // init() voláme zde, pokud není volán v konstruktoru stavu
+            // nebo pokud chceme explicitní re-inicializaci
             currentState.onEnter();
+        } else {
+            System.err.println("CurrentState je null po pokusu o nastavení typu: " + type);
         }
     }
 
     public GameState getCurrentState() {
         return currentState;
     }
-
-    // update() a render() metody StateManageru by jen volaly metody aktuálního stavu
-    // Tyto jsou již volány přímo z Game třídy na getCurrentState().update() / .render()
 }
