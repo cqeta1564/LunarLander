@@ -1,19 +1,15 @@
 package core;
 
-import states.StateManager;
-import states.MenuState; // Přidán import pro nastavení počátečního stavu
 import input.InputHandler;
-
-import java.awt.*;
-
-// Další importy podle potřeby
+import states.StateManager;
+import java.awt.Color;
+import java.awt.Graphics2D;
 
 public class Game implements Runnable {
 
     private Window window;
     private StateManager stateManager;
     private InputHandler inputHandler;
-    // private AudioManager audioManager;
 
     private Thread gameThread;
     private volatile boolean running = false;
@@ -21,21 +17,20 @@ public class Game implements Runnable {
     public static final int DEFAULT_WIDTH = 800;
     public static final int DEFAULT_HEIGHT = 600;
     public static final String TITLE = "Lunar Lander";
-    public static final int TARGET_FPS = 60; // <--- Ujistěte se, že je zde
-    public static final long OPTIMAL_TIME = 1000000000 / TARGET_FPS;
+
+    public static final int TARGET_FPS = 60;
+    public static final int TARGET_UPS = 60;
 
     public Game() {
         inputHandler = new InputHandler();
-        window = new Window(DEFAULT_WIDTH, DEFAULT_HEIGHT, TITLE, this); // Předáme this pro KeyListener
-        stateManager = new StateManager(inputHandler); // InputHandler předán do StateManageru
-        // audioManager = AudioManager.getInstance();
-        // Config.load();
+        window = new Window(DEFAULT_WIDTH, DEFAULT_HEIGHT, TITLE, this);
+        stateManager = new StateManager(inputHandler);
     }
 
     public synchronized void startGame() {
         if (running) return;
         running = true;
-        gameThread = new Thread(this);
+        gameThread = new Thread(this, "GameThread");
         gameThread.start();
     }
 
@@ -45,112 +40,99 @@ public class Game implements Runnable {
         try {
             gameThread.join();
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            System.err.println("Game thread interrupted during stop: " + e.getMessage());
+            Thread.currentThread().interrupt();
         }
     }
 
     @Override
     public void run() {
+        init();
+
         long lastTime = System.nanoTime();
+        double timePerUpdate = 1000000000.0 / TARGET_UPS;
+        double unprocessedUpdates = 0;
+
         long timer = System.currentTimeMillis();
-        // Zde se TARGET_FPS používá korektně, pokud je definováno výše
-        final double ns = 1000000000.0 / TARGET_FPS;
-        double delta = 0;
         int frames = 0;
         int updates = 0;
 
-        init(); // Inicializace po vytvoření okna a před smyčkou
-
         while (running) {
-            long now = System.nanoTime();
-            delta += (now - lastTime) / ns;
-            lastTime = now;
+            long currentTime = System.nanoTime();
+            unprocessedUpdates += (currentTime - lastTime) / timePerUpdate;
+            lastTime = currentTime;
 
-            boolean shouldRender = false; // Renderovat pouze pokud proběhl update
+            // Zavoláme inputHandler.update() jednou na začátku cyklu,
+            // aby se vypočítaly "justPressed" stavy pro tento "snímek" zpracování.
+            inputHandler.update(); // <<--- ZMĚNA Z preUpdate()
 
-            while (delta >= 1) {
-                update(delta); // Předáme delta pro plynulejší fyziku
+            // Logické updaty s pevným krokem
+            // Smyčka se postará o to, aby se logika aktualizovala správným počtem kroků, pokud hra zaostává.
+            while (unprocessedUpdates >= 1.0) {
+                updateGameLogic(1.0 / TARGET_UPS); // Předání fixního delta času
                 updates++;
-                delta--;
-                shouldRender = true;
+                unprocessedUpdates -= 1.0;
             }
 
-            // Renderovat pouze pokud proběhl alespoň jeden update,
-            // nebo pokud chceme renderovat co nejčastěji (pak tuto podmínku odstranit)
-            if (shouldRender) {
-                render();
-                frames++;
-            }
+            renderGame();
+            frames++;
+
+            // Zavoláme inputHandler.finishFrame() jednou na konci cyklu, po renderování.
+            // Tím se připraví previousKeys pro výpočet "justPressed" v příštím volání inputHandler.update().
+            inputHandler.finishFrame(); // <<--- ZMĚNA Z postUpdate()
 
 
-            if (System.currentTimeMillis() - timer > 1000) {
-                timer += 1000;
+            if (System.currentTimeMillis() - timer >= 1000) {
                 System.out.println("FPS: " + frames + ", UPS: " + updates);
                 frames = 0;
                 updates = 0;
+                timer += 1000;
             }
 
-            // Omezení FPS, pokud smyčka běží příliš rychle (volitelné)
-            // Pro jednoduchost můžeme vynechat, pokud update a render nejsou náročné
-            // long loopTook = System.nanoTime() - now;
-            // if (loopTook < OPTIMAL_TIME / 2) { // Jen příklad, jak by se to dalo
-            //     try {
-            //         Thread.sleep((OPTIMAL_TIME - loopTook) / 2000000); // Spát zlomek času
-            //     } catch (InterruptedException e) {
-            //         e.printStackTrace();
-            //     }
-            // }
+            // Omezení FPS
+            long loopCycleTime = System.nanoTime() - currentTime; // Jak dlouho trval aktuální cyklus
+            long sleepTime = (long)((1000000000.0 / TARGET_FPS) - loopCycleTime);
+
+            if (sleepTime > 0) {
+                try {
+                    Thread.sleep(sleepTime / 1000000, (int) (sleepTime % 1000000));
+                } catch (InterruptedException e) {
+                    System.err.println("Game thread interrupted during sleep: " + e.getMessage());
+                    Thread.currentThread().interrupt();
+                }
+            }
         }
-        // stopGame(); // stopGame() se volá po skončení smyčky, pokud je to žádoucí
-        // nebo z externího požadavku (např. zavření okna)
     }
 
     private void init() {
-        // window.createDisplay() se volá v konstruktoru Window
-        // Nastavení počátečního stavu hry
         if (stateManager != null) {
-            // Zde se nastaví výchozí stav, např. MENU
-            // Ujistěte se, že MenuState (nebo jakýkoliv první stav) je vytvořen
-            // a StateManager ho může nastavit.
-            // V mém předchozím návrhu StateManager vytváří instance stavů v setState.
             stateManager.setState(StateManager.StateType.MENU);
         } else {
             System.err.println("StateManager nebyl inicializován před init() v Game!");
         }
-        // Načtení zdrojů atd.
     }
 
-    private void update(double deltaTime) {
-        inputHandler.update(); // Aktualizace stavů kláves z InputHandleru
+    private void updateGameLogic(double deltaTime) {
         if (stateManager.getCurrentState() != null) {
             stateManager.getCurrentState().update(deltaTime);
         }
     }
 
-    private void render() {
-        Graphics2D g = window.getGraphicsContext(); // Získání Graphics2D z Window
+    private void renderGame() {
+        Graphics2D g = window.getGraphicsContext();
         if (g != null) {
-            // Vyčištění obrazovky (může být součástí Rendereru nebo zde)
-            g.setColor(Color.BLACK); // Příklad barvy pozadí
+            g.setColor(Color.BLACK);
             g.fillRect(0, 0, window.getWidth(), window.getHeight());
-
             if (stateManager.getCurrentState() != null) {
-                stateManager.getCurrentState().render(g); // Předáme Graphics2D
+                stateManager.getCurrentState().render(g);
             }
-
-            g.dispose(); // Uvolnění grafického kontextu PO všem kreslení
-            window.showGraphics(); // Zobrazení bufferu
+            g.dispose();
+            window.showGraphics();
         } else {
             System.err.println("Nepodařilo se získat Graphics context pro renderování.");
         }
     }
 
-    public InputHandler getInputHandler() {
-        return inputHandler;
-    }
-
-    public Window getWindow() {
-        return window;
-    }
-    // public AudioManager getAudioManager() { return audioManager; }
+    public InputHandler getInputHandler() { return inputHandler; }
+    public Window getWindow() { return window; }
 }

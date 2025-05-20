@@ -2,12 +2,10 @@ package audio;
 
 public class AudioManager {
     private static AudioManager instance;
-
     private int globalVolume; // Hlasitost 0-100
 
     private AudioManager() {
-        // Výchozí hlasitost, např. 70%
-        this.globalVolume = 70;
+        this.globalVolume = 70; // Výchozí hlasitost
     }
 
     public static synchronized AudioManager getInstance() {
@@ -29,8 +27,7 @@ public class AudioManager {
         } else {
             this.globalVolume = volume;
         }
-        System.out.println("Global volume set to: " + this.globalVolume + "%"); // Pro ladění
-        // Zde by se v budoucnu aktualizovala hlasitost aktivních zvuků/hudby
+        System.out.println("Global volume set to: " + this.globalVolume + "%"); // Pro ladění, lze ponechat/odstranit
     }
 
     public void increaseVolume(int amount) {
@@ -41,7 +38,6 @@ public class AudioManager {
         setGlobalVolume(this.globalVolume - amount);
     }
 
-    // V budoucnu:
     // public void playSound(Sound sound) { ... }
     // public void playMusic(Music music) { ... }
     // public void stopAllSounds() { ... }

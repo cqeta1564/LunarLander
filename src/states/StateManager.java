@@ -5,19 +5,14 @@ import input.InputHandler;
 public class StateManager {
 
     public enum StateType {
-        MENU, PLAYING, SETTINGS, GAME_OVER
+        MENU, PLAYING, SETTINGS // GAME_OVER zatím nepoužíváme
     }
 
     private GameState currentState;
-    private InputHandler inputHandler;
-    // Instance stavů pro možné cachování (volitelné)
-    // private MenuState menuState;
-    // private PlayingState playingState;
-    // private SettingsState settingsState;
+    private final InputHandler inputHandler; // Může být final, pokud se nemění po konstrukci
 
     public StateManager(InputHandler inputHandler) {
         this.inputHandler = inputHandler;
-        // Počáteční stav se nastavuje z Game.init()
     }
 
     public void setState(StateType type) {
@@ -25,35 +20,30 @@ public class StateManager {
             currentState.onExit();
         }
 
-        System.out.println("StateManager: Setting state to " + type); // Ladící výpis
+        // System.out.println("StateManager: Setting state to " + type); // Lze ponechat pro ladění
 
         switch (type) {
             case MENU:
-                // if (menuState == null) menuState = new MenuState(this, inputHandler);
-                // currentState = menuState;
-                currentState = new MenuState(this, inputHandler); // Vždy nová instance nebo z cache
+                currentState = new MenuState(this, inputHandler);
                 break;
             case PLAYING:
-                // if (playingState == null) playingState = new PlayingState(this, inputHandler);
-                // currentState = playingState;
                 currentState = new PlayingState(this, inputHandler);
                 break;
-            case SETTINGS: // <<-- NOVÁ ČÁST
-                // if (settingsState == null) settingsState = new SettingsState(this, inputHandler);
-                // currentState = settingsState;
+            case SETTINGS:
                 currentState = new SettingsState(this, inputHandler);
                 break;
+            // GAME_OVER case zatím není implementován
             default:
-                System.err.println("Neznámý stav: " + type);
-                currentState = null;
+                System.err.println("Neznámý nebo neimplementovaný stav: " + type);
+                currentState = null; // Nebo přejít na výchozí/error stav
         }
 
         if (currentState != null) {
-            // currentState.init(this); // init() voláme zde, pokud není volán v konstruktoru stavu
-            // nebo pokud chceme explicitní re-inicializaci
-            currentState.onEnter();
+            currentState.init(this); // Zavoláme init pro nový stav
+            currentState.onEnter();  // A onEnter
         } else {
-            System.err.println("CurrentState je null po pokusu o nastavení typu: " + type);
+            // Toto by se nemělo stát, pokud všechny typy mají implementaci
+            System.err.println("CurrentState je null po pokusu o nastavení typu: " + type + ". Pravděpodobně chybí case ve switchi.");
         }
     }
 

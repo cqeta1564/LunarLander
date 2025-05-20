@@ -1,20 +1,17 @@
 package states;
 
-// import graphics.Renderer; // Až budeme mít třídu Renderer
-
-import java.awt.Graphics2D; // Prozatím
+import java.awt.Graphics2D;
 
 public interface GameState {
-    void init(StateManager stateManager); // Pro inicializaci stavu, předání StateManageru
+    void init(StateManager stateManager); // Pro inicializaci/re-inicializaci stavu
 
-    void update(double deltaTime);       // Aktualizace logiky stavu
+    void onEnter();                      // Voláno při každém vstupu do stavu
 
-    // void render(graphics.Renderer renderer); // Vykreslení stavu
-    void render(Graphics2D g); // Prozatímní verze s Graphics2D
+    void update(double deltaTime);       // Aktualizace logiky stavu (včetně volání handleInput)
 
-    void handleInput();                  // Zpracování vstupu specifické pro daný stav
+    void render(Graphics2D g);           // Vykreslení stavu
 
-    void onEnter();                      // Voláno při vstupu do stavu
+    void handleInput();                  // Zpracování vstupu specifické pro daný stav (voláno z update)
 
     void onExit();                       // Voláno při opuštění stavu
 }

@@ -1,118 +1,103 @@
 package core;
 
+import input.InputHandler; // Potřebujeme pro addKeyListener atd.
+
 import javax.swing.JFrame;
 import java.awt.Canvas;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.image.BufferStrategy;
 
-import input.InputHandler;
-
 public class Window {
     private JFrame frame;
-    private Canvas canvas;
+    private Canvas canvas; // Pro aktivní rendering s BufferStrategy
 
-    private int width, height;
-    private String title;
+    private final int width;
+    private final int height;
+    // private final String title; // title je použit jen v konstruktoru frame
 
     private BufferStrategy bs;
-    // private Graphics2D g; // Graphics2D context budeme získávat čerstvý pro každý frame
 
     public Window(int width, int height, String title, Game game) {
         this.width = width;
         this.height = height;
-        this.title = title;
-        createDisplay(game.getInputHandler());
+        // this.title = title; // Není potřeba ukládat, pokud se nemění
+        createDisplay(title, game.getInputHandler());
     }
 
-    private void createDisplay(InputHandler inputHandler) {
+    private void createDisplay(String title, InputHandler inputHandler) {
         frame = new JFrame(title);
-        frame.setSize(width, height);
+        // frame.setSize(width, height); // Nahrazeno pack() po přidání canvasu
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setResizable(false);
-        frame.setLocationRelativeTo(null);
-        // frame.setIgnoreRepaint(true); // Pro aktivní rendering je to dobrá praxe
+        frame.setLocationRelativeTo(null); // Centrovaní okna
 
         canvas = new Canvas();
-        canvas.setPreferredSize(new Dimension(width, height));
-        canvas.setMaximumSize(new Dimension(width, height));
-        canvas.setMinimumSize(new Dimension(width, height));
-        canvas.setFocusable(true);
+        Dimension canvasSize = new Dimension(width, height);
+        canvas.setPreferredSize(canvasSize);
+        canvas.setMaximumSize(canvasSize);
+        canvas.setMinimumSize(canvasSize);
+        canvas.setFocusable(true); // Aby mohl přijímat vstup z klávesnice
 
+        // Připojení InputHandleru ke Canvasu
         canvas.addKeyListener(inputHandler);
         canvas.addMouseListener(inputHandler);
         canvas.addMouseMotionListener(inputHandler);
 
         frame.add(canvas);
-        frame.pack();
-        frame.setVisible(true); // Důležité volat před createBufferStrategy
+        frame.pack(); // Přizpůsobí velikost frame obsahu (canvas)
+        frame.setVisible(true);
+        canvas.requestFocusInWindow(); // <<--- PŘIDAT TENTO ŘÁDEK
 
-        // Vytvoření BufferStrategy až poté, co je Canvas viditelný a přidaný do Frame
         try {
             canvas.createBufferStrategy(2); // Double buffering
             bs = canvas.getBufferStrategy();
         } catch (IllegalStateException e) {
-            System.err.println("Nelze vytvořit BufferStrategy, komponenta není zobrazitelná: " + e.getMessage());
-            // Pokud se stane, zkuste createBufferStrategy() zavolat později, např. při prvním renderu
+            System.err.println("Nelze vytvořit BufferStrategy: " + e.getMessage() + ". Komponenta nemusí být zobrazitelná.");
         }
         if (bs == null) {
-            System.err.println("BufferStrategy se nepodařilo vytvořit. Zkuste restartovat aplikaci.");
-            // Možná bude potřeba fallback na jednodušší rendering nebo jiný přístup
+            // Zkusit znovu po krátké pauze, pokud by setVisible nebylo dokončeno
+            try {
+                Thread.sleep(100); // Krátká pauza
+                canvas.createBufferStrategy(2);
+                bs = canvas.getBufferStrategy();
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                System.err.println("Vytváření BufferStrategy přerušeno.");
+            } catch (IllegalStateException ise) {
+                System.err.println("Stále nelze vytvořit BufferStrategy: " + ise.getMessage());
+            }
+        }
+        if (bs == null) {
+            System.err.println("BufferStrategy se nepodařilo vytvořit. Hra nemusí správně vykreslovat.");
         }
     }
 
-    /**
-     * Vrací Graphics2D kontext pro kreslení na aktuální buffer.
-     * Tato metoda by měla být volána na začátku každého render cyklu.
-     *
-     * @return Graphics2D context, nebo null pokud BufferStrategy není dostupná.
-     */
     public Graphics2D getGraphicsContext() {
         if (bs == null) {
-            // Pokus o znovuvytvoření, pokud selhalo v createDisplay
+            // Pokus o záchranu, pokud selhalo při inicializaci
             try {
                 canvas.createBufferStrategy(2);
                 bs = canvas.getBufferStrategy();
                 if (bs == null) {
-                    System.err.println("Stále se nedaří získat BufferStrategy v getGraphicsContext.");
+                    System.err.println("Kritická chyba: BufferStrategy není dostupná v getGraphicsContext.");
                     return null;
                 }
             } catch (Exception e) {
-                System.err.println("Chyba při pokusu o znovuvytvoření BufferStrategy: " + e.getMessage());
+                System.err.println("Chyba při nouzovém vytváření BufferStrategy: " + e.getMessage());
                 return null;
             }
         }
-        return (Graphics2D) bs.getDrawGraphics();
+        return (Graphics2D) bs.getDrawGraphics(); // Získá nový Graphics context pro kreslení
     }
 
-    /**
-     * Zobrazí nakreslený buffer na obrazovce a uvolní grafický kontext.
-     * Tato metoda by měla být volána na konci každého render cyklu.
-     * Graphics2D context získaný z getGraphicsContext() by měl být uvolněn.
-     */
     public void showGraphics() {
-        if (bs != null) {
-            // Graphics2D context by měl být uvolněn tím, kdo ho získal, typicky:
-            // Graphics2D g = window.getGraphicsContext();
-            // ... kreslení ...
-            // g.dispose(); // <-- Uvolnění zde
-            // window.showGraphics();
-
-            // Nicméně, getDrawGraphics() vrací nový objekt pokaždé, takže dispose na něm je OK.
-            // Samotné bs.show() provede výměnu bufferů.
-            if (!bs.contentsLost()) { // Zkontrolujeme, jestli obsah bufferu nebyl ztracen
-                bs.show();
-            }
+        if (bs != null && !bs.contentsLost()) {
+            bs.show(); // Vymění buffery
+        } else if (bs != null && bs.contentsLost()) {
+            System.err.println("Obsah BufferStrategy byl ztracen.");
+            // Zde by mohla být logika pro obnovu obsahu, pokud je to nutné
         }
-    }
-
-    // Gettery
-    public Canvas getCanvas() {
-        return canvas;
-    }
-
-    public JFrame getFrame() {
-        return frame;
     }
 
     public int getWidth() {
@@ -122,4 +107,10 @@ public class Window {
     public int getHeight() {
         return height;
     }
+
+    // getCanvas() a getFrame() mohou být užitečné pro pokročilejší operace nebo ladění
+    public Canvas getCanvas() {
+        return canvas;
+    }
+    // public JFrame getFrame() { return frame; }
 }
