@@ -1,9 +1,13 @@
-import core.Game;
+import javax.swing.*;
 
 public class Main {
+    /**
+     * Hlavní metoda pro spuštění aplikace.
+     * Vytváří instanci {@link VectorPointAppZoomUndo} v rámci Swing Event Dispatch Threadu.
+     *
+     * @param args Argumenty příkazové řádky (nejsou využity).
+     */
     public static void main(String[] args) {
-        // Vytvoření instance hlavní herní třídy
-        Game lunarLanderGame = new Game();
-        lunarLanderGame.startGame(); // Nebo jen game.run(), záleží na implementaci GameLoop
+        SwingUtilities.invokeLater(VectorPointAppZoomUndo::new);
     }
 }
