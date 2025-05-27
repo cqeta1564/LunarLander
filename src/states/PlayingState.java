@@ -1,26 +1,22 @@
 package states;
 
-import core.Game; // Pro přístup k DEFAULT_WIDTH/HEIGHT a dalším konstantám
+import core.Game;
+import entities.Lander;
 import entities.Terrain;
 import input.GameAction;
 import input.InputHandler;
-import input.KeyBindings; // Pro debug zobrazení aktuálních kláves
+import input.KeyBindings;
 
-import java.awt.Color;
-import java.awt.Font;
-import java.awt.Graphics2D;
-// import entities.Lander; // Až budete mít třídu Lander
+import java.awt.*;
 
 public class PlayingState implements GameState {
 
     private final StateManager stateManager;
     private final InputHandler inputHandler;
     private Terrain terrain;
-    // private Lander lander; // Instance lodi hráče
-
-    // Pozice kamery nebo levého okraje viditelné části světa
-    // Prozatím statická, ale pro "nekonečný" terén by se měnila
+    private Lander lander;
     private float cameraX = 0;
+    private boolean playerControlTakenSinceEnter = false;
 
     public PlayingState(StateManager stateManager, InputHandler inputHandler) {
         this.stateManager = stateManager;
@@ -29,134 +25,97 @@ public class PlayingState implements GameState {
 
     @Override
     public void init(StateManager manager) {
-        // Tato metoda se volá jednou při vytváření stavu StateManagerem.
-        // Můžeme zde inicializovat zdroje, které se nemění při každém vstupu do stavu.
-        // Terén se nyní vytváří v onEnter pro případ, že by se měl generovat vždy nový.
-        // Pokud je terén statický (jako naše pevná mapa), mohl by se vytvářet i zde.
-        // lander = new Lander(Game.DEFAULT_WIDTH / 2.0f, Game.DEFAULT_HEIGHT / 4.0f); // Příklad pozice landeru
     }
 
     @Override
     public void onEnter() {
         System.out.println("Vstup do PlayingState.");
-        // Vytvoření (nebo znovuvytvoření/načtení) terénu
-        if (this.terrain == null) { // Vytvoříme terén jen pokud ještě neexistuje
+        if (this.terrain == null) {
             this.terrain = new Terrain(Game.DEFAULT_WIDTH, Game.DEFAULT_HEIGHT);
         }
-        // Aktualizujeme viditelnou část terénu na základě pozice kamery
-        // Pro statickou kameru na začátku světa:
-        this.cameraX = 0; // Nebo pozice landeru, pokud se kamera centruje na něj
+        this.cameraX = 0;
         this.terrain.populateVisibleTerrain(cameraX, Game.DEFAULT_WIDTH);
 
-        // Reset landeru (pozice, palivo, atd.)
-        // if (lander != null) {
-        //     lander.reset(Game.DEFAULT_WIDTH / 2.0f, Game.DEFAULT_HEIGHT / 4.0f);
-        // }
+        if (this.lander == null) {
+            this.lander = new Lander((float) -Lander.INITIAL_FLYOVER_SPEED_X_PIXELS_S, Game.DEFAULT_HEIGHT * Lander.INITIAL_FLYOVER_START_Y_RATIO);
+        } else {
+            lander.reset((float) -Lander.INITIAL_FLYOVER_SPEED_X_PIXELS_S, Game.DEFAULT_HEIGHT * Lander.INITIAL_FLYOVER_START_Y_RATIO);
+        }
+        playerControlTakenSinceEnter = false;
     }
 
     @Override
     public void update(double deltaTime) {
         handleInput();
 
-        // Aktualizace logiky lodi
-        // if (lander != null) {
-        //     lander.update(deltaTime, terrain); // Lander může potřebovat info o terénu pro kolize
-        // }
-
-        // Pokud by se kamera pohybovala s landerem:
-        // if (lander != null) {
-        //     cameraX = lander.getX() - Game.DEFAULT_WIDTH / 2.0f; // Příklad jednoduchého sledování
-        //     // Omezit cameraX, aby se nezobrazovalo "mimo svět" pokud není nekonečný
-        //     terrain.populateVisibleTerrain(cameraX, Game.DEFAULT_WIDTH);
-        // }
-
-        // Zde další herní logika:
-        // - Kontrola přistání na plošce
-        // - Kontrola havárie
-        // - Správa paliva
-        // - Výpočet skóre
-        // - Přechod do stavu GAME_OVER nebo další úrovně
+        if (lander != null) {
+            lander.update(deltaTime, terrain);
+        }
     }
 
     @Override
     public void handleInput() {
-        // Návrat do menu
         if (inputHandler.isEscJustPressed()) {
             stateManager.setState(StateManager.StateType.MENU);
-            return; // Ukončíme handleInput, pokud přecházíme do jiného stavu
+            return;
         }
 
-        // Ovládání lodi pomocí herních akcí
-        // if (lander != null) {
-        //     lander.setThrusterActive(inputHandler.isActionActive(GameAction.THRUST));
-        //
-        //     if (inputHandler.isActionActive(GameAction.ROTATE_LEFT)) {
-        //         lander.rotateLeft(Lander.ROTATION_ANGLE_PER_SECOND); // Předpokládá konstantu v Lander
-        //     } else if (inputHandler.isActionActive(GameAction.ROTATE_RIGHT)) {
-        //         lander.rotateRight(Lander.ROTATION_ANGLE_PER_SECOND);
-        //     } else {
-        //         lander.stopRotation();
-        //     }
-        // }
+        if (lander == null) return;
 
-        // Ladící výpisy pro aktivní akce (lze odstranit v produkční verzi)
-        if (inputHandler.isActionActive(GameAction.THRUST)) {
-            // System.out.println("HRA: Akce TAH MOTORU");
-        }
+        boolean actionKeyPressed = false;
+        int rotation = 0;
         if (inputHandler.isActionActive(GameAction.ROTATE_LEFT)) {
-            // System.out.println("HRA: Akce ROTACE VLEVO");
+            rotation = -1;
+            actionKeyPressed = true;
+        } else if (inputHandler.isActionActive(GameAction.ROTATE_RIGHT)) {
+            rotation = 1;
+            actionKeyPressed = true;
         }
-        if (inputHandler.isActionActive(GameAction.ROTATE_RIGHT)) {
-            // System.out.println("HRA: Akce ROTACE VPRAVO");
+        lander.setRotation(rotation);
+
+        boolean thrusting = inputHandler.isActionActive(GameAction.THRUST);
+        if (thrusting) {
+            actionKeyPressed = true;
+        }
+        lander.setThrusterActive(thrusting);
+
+        if (actionKeyPressed && !playerControlTakenSinceEnter) {
+            lander.playerHasTakenControl();
+            playerControlTakenSinceEnter = true;
         }
     }
 
     @Override
     public void render(Graphics2D g) {
-        // Vykreslení pozadí (např. hvězdy, pokud terén nekryje celou výšku)
-        g.setColor(new Color(10, 10, 20)); // Velmi tmavě modrá pro vesmír
+        g.setColor(new Color(10, 10, 20));
         g.fillRect(0, 0, Game.DEFAULT_WIDTH, Game.DEFAULT_HEIGHT);
 
-        // Vykreslení terénu
-        // Metoda terrain.render() by měla kreslit relativně k aktuálnímu pohledu (cameraX)
-        // nebo Graphics2D context by mohl být transformován (g.translate(-cameraX, 0))
-        // Prozatím náš Terrain.render() kreslí body tak, jak jsou v terrainSurfacePoints,
-        // a populateVisibleTerrain() se stará o to, aby tyto body byly pro aktuální pohled.
         if (terrain != null) {
             terrain.render(g);
         }
 
-        // Vykreslení lodi
-        // if (lander != null) {
-        //      // Podobně jako u terénu, lander by se kreslil s ohledem na cameraX
-        //      // Graphics2D gLander = (Graphics2D) g.create();
-        //      // gLander.translate(-cameraX, 0);
-        //      // lander.render(gLander);
-        //      // gLander.dispose();
-        //      // Nebo lander.render(g, cameraX);
-        //      lander.render(g); // Pokud lander počítá se svou pozicí na obrazovce
-        // }
+        if (lander != null) {
+            lander.render(g);
+        }
 
-
-        // Zobrazení herních informací (HUD) - skóre, palivo, rychlost atd.
         g.setColor(Color.WHITE);
         g.setFont(new Font("Monospaced", Font.BOLD, 16));
-        g.drawString("PALIVO: XXX", 10, 20);
-        g.drawString("VÝŠKA: YYY", 10, 40);
-        g.drawString("RYCHLOST X: Vx", 10, 60);
-        g.drawString("RYCHLOST Y: Vy", 10, 80);
-        g.drawString("SKÓRE: ZZZ", Game.DEFAULT_WIDTH - 150, 20);
+        if (lander != null) {
+            g.drawString(String.format("X: %.0f Y: %.0f", lander.getX(), lander.getY()), 10, 20);
+        }
+        g.drawString("SKÓRE: 0", Game.DEFAULT_WIDTH - 150, 20);
 
-
-        // Debug info - aktuální klávesy pro akce (můžete ponechat nebo odstranit)
         KeyBindings kb = inputHandler.getKeyBindings();
         if (kb != null) {
             g.setFont(new Font("Monospaced", Font.PLAIN, 10));
-            g.setColor(new Color(200, 200, 200, 180)); // Poloprůhledná světle šedá
+            g.setColor(new Color(200, 200, 200, 180));
             int yPos = Game.DEFAULT_HEIGHT - 45;
-            g.drawString("Ovládání:", 10, yPos); yPos += 12;
-            g.drawString(" Tah: " + kb.getKeyTextForAction(GameAction.THRUST), 10, yPos); yPos += 12;
-            g.drawString(" Vlevo: " + kb.getKeyTextForAction(GameAction.ROTATE_LEFT), 10, yPos); yPos += 12;
+            g.drawString("Ovládání:", 10, yPos);
+            yPos += 12;
+            g.drawString(" Tah: " + kb.getKeyTextForAction(GameAction.THRUST), 10, yPos);
+            yPos += 12;
+            g.drawString(" Vlevo: " + kb.getKeyTextForAction(GameAction.ROTATE_LEFT), 10, yPos);
+            yPos += 12;
             g.drawString(" Vpravo: " + kb.getKeyTextForAction(GameAction.ROTATE_RIGHT), 10, yPos);
         }
     }
@@ -164,10 +123,9 @@ public class PlayingState implements GameState {
     @Override
     public void onExit() {
         System.out.println("Opuštění PlayingState.");
-        // Případné uvolnění zdrojů specifických pro tento stav,
-        // nebo zastavení zvuků motoru lodi atd.
-        // if (lander != null) {
-        //    lander.setThrusterActive(false);
-        // }
+        if (lander != null) {
+            lander.setThrusterActive(false);
+            lander.setRotation(0);
+        }
     }
 }
