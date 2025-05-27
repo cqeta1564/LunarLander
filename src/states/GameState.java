@@ -1,17 +1,17 @@
 package states;
 
-import java.awt.Graphics2D;
+import java.awt.*;
 
 public interface GameState {
-    void init(StateManager stateManager); // Pro inicializaci/re-inicializaci stavu
+    void init(StateManager stateManager);
 
-    void onEnter();                      // Voláno při každém vstupu do stavu
+    void onEnter();
 
-    void update(double deltaTime);       // Aktualizace logiky stavu (včetně volání handleInput)
+    void update(double deltaTime);
 
-    void render(Graphics2D g);           // Vykreslení stavu
+    void render(Graphics2D g);
 
-    void handleInput();                  // Zpracování vstupu specifické pro daný stav (voláno z update)
+    void handleInput();
 
-    void onExit();                       // Voláno při opuštění stavu
+    void onExit();
 }

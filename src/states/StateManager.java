@@ -4,13 +4,8 @@ import input.InputHandler;
 
 public class StateManager {
 
-    public enum StateType {
-        MENU, PLAYING, SETTINGS // GAME_OVER zatím nepoužíváme
-    }
-
+    private final InputHandler inputHandler;
     private GameState currentState;
-    private final InputHandler inputHandler; // Může být final, pokud se nemění po konstrukci
-
     public StateManager(InputHandler inputHandler) {
         this.inputHandler = inputHandler;
     }
@@ -19,9 +14,6 @@ public class StateManager {
         if (currentState != null) {
             currentState.onExit();
         }
-
-        // System.out.println("StateManager: Setting state to " + type); // Lze ponechat pro ladění
-
         switch (type) {
             case MENU:
                 currentState = new MenuState(this, inputHandler);
@@ -35,19 +27,22 @@ public class StateManager {
             // GAME_OVER case zatím není implementován
             default:
                 System.err.println("Neznámý nebo neimplementovaný stav: " + type);
-                currentState = null; // Nebo přejít na výchozí/error stav
+                currentState = null;
         }
 
         if (currentState != null) {
-            currentState.init(this); // Zavoláme init pro nový stav
-            currentState.onEnter();  // A onEnter
+            currentState.init(this);
+            currentState.onEnter();
         } else {
-            // Toto by se nemělo stát, pokud všechny typy mají implementaci
             System.err.println("CurrentState je null po pokusu o nastavení typu: " + type + ". Pravděpodobně chybí case ve switchi.");
         }
     }
 
     public GameState getCurrentState() {
         return currentState;
+    }
+
+    public enum StateType {
+        MENU, PLAYING, SETTINGS
     }
 }

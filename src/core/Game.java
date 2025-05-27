@@ -2,26 +2,21 @@ package core;
 
 import input.InputHandler;
 import states.StateManager;
-import java.awt.Color;
-import java.awt.Graphics2D;
+
+import java.awt.*;
 
 public class Game implements Runnable {
 
-    private Window window;
-    private StateManager stateManager;
-    private InputHandler inputHandler;
-
-    private Thread gameThread;
-    private volatile boolean running = false;
-
-    // --- ZMĚNA ROZMĚRŮ OKNA ---
-    public static final int DEFAULT_WIDTH = 1200; // Nová šířka
-    public static final int DEFAULT_HEIGHT = 675; // Nová výška (1200 / 16 * 9 = 675)
-    // --- KONEC ZMĚNY ROZMĚRŮ ---
+    public static final int DEFAULT_WIDTH = 1200;
+    public static final int DEFAULT_HEIGHT = 675;
     public static final String TITLE = "Lunar Lander";
-
     public static final int TARGET_FPS = 60;
     public static final int TARGET_UPS = 60;
+    private final Window window;
+    private final StateManager stateManager;
+    private final InputHandler inputHandler;
+    private Thread gameThread;
+    private volatile boolean running = false;
 
     public Game() {
         inputHandler = new InputHandler();
@@ -85,7 +80,7 @@ public class Game implements Runnable {
             }
 
             long loopCycleTime = System.nanoTime() - currentTime;
-            long sleepTime = (long)((1000000000.0 / TARGET_FPS) - loopCycleTime);
+            long sleepTime = (long) ((1000000000.0 / TARGET_FPS) - loopCycleTime);
 
             if (sleepTime > 0) {
                 try {
@@ -127,6 +122,11 @@ public class Game implements Runnable {
         }
     }
 
-    public InputHandler getInputHandler() { return inputHandler; }
-    public Window getWindow() { return window; }
+    public InputHandler getInputHandler() {
+        return inputHandler;
+    }
+
+    public Window getWindow() {
+        return window;
+    }
 }

@@ -1,9 +1,7 @@
 package input;
 
 public enum GameAction {
-    ROTATE_LEFT("Rotace vlevo"),
-    ROTATE_RIGHT("Rotace vpravo"),
-    THRUST("Tah motoru");
+    ROTATE_LEFT("Rotace vlevo"), ROTATE_RIGHT("Rotace vpravo"), THRUST("Tah motoru");
 
     private final String displayName;
 
@@ -11,11 +9,11 @@ public enum GameAction {
         this.displayName = displayName;
     }
 
-    public String getDisplayName() {
-        return displayName;
-    }
-
     public static GameAction[] getAllActions() {
         return values();
+    }
+
+    public String getDisplayName() {
+        return displayName;
     }
 }

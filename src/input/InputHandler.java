@@ -1,31 +1,21 @@
 package input;
 
-import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.awt.event.MouseMotionListener;
+import java.awt.event.*;
 import java.util.Arrays;
 
 public class InputHandler implements KeyListener, MouseListener, MouseMotionListener {
 
     private final boolean[] currentKeys = new boolean[256];
     private final boolean[] previousKeys = new boolean[256];
-
-    // Příznaky "právě stisknuto"
+    private final KeyBindings keyBindings;
+    public int mouseX, mouseY;
+    public boolean mouseLeftPressed;
+    public boolean mouseRightPressed;
     private boolean escapeJustPressed;
     private boolean enterJustPressed;
     private boolean sKeyJustPressed;
     private boolean mouseLeftJustPressed;
-
-    // Stavy myši
-    public int mouseX, mouseY;
-    public boolean mouseLeftPressed;  // true, pokud je levé tlačítko aktuálně drženo
-    public boolean mouseRightPressed;
-    private boolean previousMouseLeftState = false; // Pro výpočet mouseLeftJustPressed
-
-    // Remapování kláves
-    private final KeyBindings keyBindings;
+    private boolean previousMouseLeftState = false;
     private boolean isListeningForKey = false;
     private GameAction actionToRebind = null;
     private int rawKeyCodeForRebind = KeyEvent.VK_UNDEFINED;
@@ -36,11 +26,6 @@ public class InputHandler implements KeyListener, MouseListener, MouseMotionList
         Arrays.fill(previousKeys, false);
     }
 
-    /**
-     * Voláno JEDNOU za herní cyklus, na jeho začátku (např. v Game.run() nebo Game.updateGameLogic()).
-     * Vypočítá "just pressed" stavy pro tento snímek na základě změn od předchozího snímku.
-     * Přejmenováno z preUpdate().
-     */
     public void update() {
         escapeJustPressed = isKeyDown(KeyEvent.VK_ESCAPE) && !wasKeyDown(KeyEvent.VK_ESCAPE);
         enterJustPressed = isKeyDown(KeyEvent.VK_ENTER) && !wasKeyDown(KeyEvent.VK_ENTER);
@@ -49,11 +34,6 @@ public class InputHandler implements KeyListener, MouseListener, MouseMotionList
         mouseLeftJustPressed = mouseLeftPressed && !previousMouseLeftState;
     }
 
-    /**
-     * Voláno na konci každého herního cyklu.
-     * Uloží aktuální stav kláves a myši pro použití v příštím cyklu jako "předchozí stav".
-     * Přejmenováno z postUpdate().
-     */
     public void finishFrame() {
         System.arraycopy(currentKeys, 0, previousKeys, 0, currentKeys.length);
         previousMouseLeftState = mouseLeftPressed;
@@ -82,7 +62,9 @@ public class InputHandler implements KeyListener, MouseListener, MouseMotionList
     }
 
     @Override
-    public void keyTyped(KeyEvent e) { /* Nepoužíváno */ }
+    public void keyTyped(KeyEvent e) {
+
+    }
 
     private boolean isValidKeyForBinding(int keyCode) {
         switch (keyCode) {
@@ -105,7 +87,7 @@ public class InputHandler implements KeyListener, MouseListener, MouseMotionList
         return keyCode >= 0 && keyCode < currentKeys.length && currentKeys[keyCode];
     }
 
-    private boolean wasKeyDown(int keyCode) { // private, protože stavy by měly používat "justPressed" nebo "isDown"
+    private boolean wasKeyDown(int keyCode) {
         return keyCode >= 0 && keyCode < previousKeys.length && previousKeys[keyCode];
     }
 
@@ -139,7 +121,6 @@ public class InputHandler implements KeyListener, MouseListener, MouseMotionList
 
     public void stopListeningForKey() {
         isListeningForKey = false;
-        // actionToRebind se nemaže zde, ale až ve stavu po úspěšném rebindu/zrušení
     }
 
     public boolean isListening() {
@@ -161,7 +142,9 @@ public class InputHandler implements KeyListener, MouseListener, MouseMotionList
     }
 
     @Override
-    public void mouseClicked(MouseEvent e) { /* Zatím explicitně nepoužíváme */ }
+    public void mouseClicked(MouseEvent e) {
+
+    }
 
     @Override
     public void mousePressed(MouseEvent e) {
