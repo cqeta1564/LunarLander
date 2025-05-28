@@ -21,14 +21,11 @@ public class Slider {
         this.height = sliderTrackHeight;
         this.minValue = minValue;
         this.maxValue = maxValue;
-
         this.knobWidth = 10;
         this.knobHeight = sliderTrackHeight + 10;
-
         int sliderBoundsY = y + sliderTrackHeight / 2 - knobHeight / 2;
         this.sliderBounds = new Rectangle(x, sliderBoundsY, width, knobHeight);
         this.knobBounds = new Rectangle(0, 0, this.knobWidth, this.knobHeight);
-
         setValue(initialValue);
     }
 
@@ -82,16 +79,25 @@ public class Slider {
     }
 
     public void render(Graphics2D g) {
+        // Uložíme původní nastavení anti-aliasingu (volitelné, ale dobrá praxe)
+        Object originalTextAntialiasing = g.getRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING);
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
         g.setColor(Color.WHITE);
         g.setFont(new Font("Arial", Font.PLAIN, 18));
         g.drawString(label + ": " + currentValue + "%", x, y - 5);
+
+        // Obnovíme původní nastavení (pokud jsme ho uložili)
+        // g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, originalTextAntialiasing);
+        // Pro jednoduchost můžeme nechat zapnuté, pokud další kreslení v této metodě není text.
+
         g.setColor(Color.GRAY);
         g.fillRect(x, y, width, height);
         g.setColor(Color.DARK_GRAY);
         g.drawRect(x, y, width, height);
         g.setColor(Color.LIGHT_GRAY);
         g.fillRect(knobBounds.x, knobBounds.y, knobBounds.width, knobBounds.height);
-        g.setColor(Color.WHITE); // Okraj jezdce
+        g.setColor(Color.WHITE);
         g.drawRect(knobBounds.x, knobBounds.y, knobBounds.width, knobBounds.height);
     }
 }
