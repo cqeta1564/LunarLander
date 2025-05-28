@@ -29,13 +29,11 @@ public class Lander {
     // Změna viditelnosti na public
     public static final int DISPLAY_LANDER_WIDTH = (int) (ORIGINAL_LANDER_IMAGE_WIDTH / IMAGE_SCALE_DIVISOR);
     public static final int DISPLAY_LANDER_HEIGHT = (int) (ORIGINAL_LANDER_IMAGE_HEIGHT / IMAGE_SCALE_DIVISOR);
-
+    private static final double LANDING_GEAR_Y_OFFSET = DISPLAY_LANDER_HEIGHT / 2.0;
     private static final double MAX_LANDING_SPEED_Y_PIXELS_S = 40;
     private static final double MAX_LANDING_SPEED_X_PIXELS_S = 30;
     private static final double MAX_LANDING_ANGLE_DEGREES = 8.0;
     private static final double MAX_LANDING_ANGLE_RADIANS = Math.toRadians(MAX_LANDING_ANGLE_DEGREES);
-
-    private static final double LANDING_GEAR_Y_OFFSET = DISPLAY_LANDER_HEIGHT / 2.0;
     private static final double LANDING_GEAR_WIDTH_FACTOR = 0.7;
 
     private static final double THRUSTER_RAMP_UP_PER_SECOND = 0.75;
@@ -44,11 +42,7 @@ public class Lander {
     private static final int FLAME_MIN_LENGTH = 5;
     private static final int FLAME_MAX_LENGTH = 20;
     private static final double FLAME_BASE_WIDTH_RATIO = 0.6;
-
-    // Změna viditelnosti enumu na public
-    public enum State {
-        INITIAL_FLYOVER, PLAYER_CONTROL, LANDED, CRASHED
-    }
+    private final Point2D.Double[] collisionPointsLocal;
     private State currentState;
 
     private double x, y;
@@ -59,8 +53,6 @@ public class Lander {
     private int rotationDirection = 0;
 
     private BufferedImage landerImage;
-    private final Point2D.Double[] collisionPointsLocal;
-
     public Lander(float startX, float startY) {
         try {
             landerImage = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/pictures/ship.png")));
@@ -69,10 +61,7 @@ public class Lander {
             landerImage = null;
         }
 
-        collisionPointsLocal = new Point2D.Double[]{
-                new Point2D.Double(-DISPLAY_LANDER_WIDTH / 2.0 * LANDING_GEAR_WIDTH_FACTOR, LANDING_GEAR_Y_OFFSET),
-                new Point2D.Double(DISPLAY_LANDER_WIDTH / 2.0 * LANDING_GEAR_WIDTH_FACTOR, LANDING_GEAR_Y_OFFSET)
-        };
+        collisionPointsLocal = new Point2D.Double[]{new Point2D.Double(-DISPLAY_LANDER_WIDTH / 2.0 * LANDING_GEAR_WIDTH_FACTOR, LANDING_GEAR_Y_OFFSET), new Point2D.Double(DISPLAY_LANDER_WIDTH / 2.0 * LANDING_GEAR_WIDTH_FACTOR, LANDING_GEAR_Y_OFFSET)};
         reset(startX, startY);
     }
 
@@ -112,7 +101,8 @@ public class Lander {
 
     public void update(double deltaTime, Terrain terrain) {
         if (currentState == State.LANDED || currentState == State.CRASHED) {
-            vx = 0; vy = 0;
+            vx = 0;
+            vy = 0;
             currentThrustOutput = 0.0;
             playerRequestsThrust = false;
             rotationDirection = 0;
@@ -210,7 +200,8 @@ public class Lander {
             if (onSafePad) currentState = State.LANDED;
             else currentState = State.CRASHED;
 
-            vx = 0; vy = 0;
+            vx = 0;
+            vy = 0;
             playerRequestsThrust = false;
             currentThrustOutput = 0.0;
             rotationDirection = 0;
@@ -233,9 +224,9 @@ public class Lander {
             else fallbackColor = Color.CYAN;
             g.setColor(fallbackColor);
             Polygon fallbackShape = new Polygon();
-            fallbackShape.addPoint(0, -DISPLAY_LANDER_HEIGHT/2);
-            fallbackShape.addPoint(-DISPLAY_LANDER_WIDTH/2, DISPLAY_LANDER_HEIGHT/2);
-            fallbackShape.addPoint(DISPLAY_LANDER_WIDTH/2, DISPLAY_LANDER_HEIGHT/2);
+            fallbackShape.addPoint(0, -DISPLAY_LANDER_HEIGHT / 2);
+            fallbackShape.addPoint(-DISPLAY_LANDER_WIDTH / 2, DISPLAY_LANDER_HEIGHT / 2);
+            fallbackShape.addPoint(DISPLAY_LANDER_WIDTH / 2, DISPLAY_LANDER_HEIGHT / 2);
             g.fillPolygon(fallbackShape);
             g.setColor(Color.WHITE);
             g.drawPolygon(fallbackShape);
@@ -243,7 +234,7 @@ public class Lander {
 
         if (currentThrustOutput > 0.05 && (currentState == State.PLAYER_CONTROL || currentState == State.INITIAL_FLYOVER)) {
             float flameBaseY = DISPLAY_LANDER_HEIGHT / 2.0f;
-            float flameBaseHalfWidth = (DISPLAY_LANDER_WIDTH * (float)FLAME_BASE_WIDTH_RATIO) / 2.0f;
+            float flameBaseHalfWidth = (DISPLAY_LANDER_WIDTH * (float) FLAME_BASE_WIDTH_RATIO) / 2.0f;
             float flameTipLength = (float) (FLAME_MIN_LENGTH + (FLAME_MAX_LENGTH - FLAME_MIN_LENGTH) * currentThrustOutput);
             flameTipLength += (Math.random() * 5.0f - 2.5f) * currentThrustOutput;
             flameTipLength = Math.max(0, flameTipLength);
@@ -259,7 +250,19 @@ public class Lander {
         g.setTransform(oldTransform);
     }
 
-    public double getX() { return x; }
-    public double getY() { return y; }
-    public State getCurrentState() { return currentState; } // Nyní je State public
+    public double getX() {
+        return x;
+    }
+
+    public double getY() {
+        return y;
+    }
+
+    public State getCurrentState() {
+        return currentState;
+    } // Nyní je State public
+
+    public enum State {
+        INITIAL_FLYOVER, PLAYER_CONTROL, LANDED, CRASHED
+    }
 }

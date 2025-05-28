@@ -6,6 +6,7 @@ public class StateManager {
 
     private final InputHandler inputHandler;
     private GameState currentState;
+
     public StateManager(InputHandler inputHandler) {
         this.inputHandler = inputHandler;
     }
@@ -24,7 +25,6 @@ public class StateManager {
             case SETTINGS:
                 currentState = new SettingsState(this, inputHandler);
                 break;
-            // GAME_OVER case zatím není implementován
             default:
                 System.err.println("Neznámý nebo neimplementovaný stav: " + type);
                 currentState = null;

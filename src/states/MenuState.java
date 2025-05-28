@@ -2,6 +2,7 @@ package states;
 
 import core.Game;
 import input.InputHandler;
+
 import java.awt.*;
 
 public class MenuState implements GameState {

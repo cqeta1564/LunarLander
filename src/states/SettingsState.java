@@ -6,6 +6,7 @@ import input.GameAction;
 import input.InputHandler;
 import input.KeyBindings;
 import ui.Slider;
+
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
@@ -90,7 +91,6 @@ public class SettingsState implements GameState {
                 }
                 inputHandler.stopListeningForKey();
                 currentlySelectedActionToRebind = null;
-                // return; // Není nutný return zde, pokud Esc pro zavření menu používá isEscJustPressed
             }
         } else {
             if (inputHandler.isMouseLeftJustPressed()) {
@@ -121,7 +121,7 @@ public class SettingsState implements GameState {
         int titleWidth = fmTitle.stringWidth(titleText);
         g.drawString(titleText, (Game.DEFAULT_WIDTH - titleWidth) / 2, 80);
 
-        volumeSlider.render(g); // Slider si řeší vlastní anti-aliasing pro svůj text
+        volumeSlider.render(g);
 
         g.setFont(new Font("Arial", Font.BOLD, 24));
         g.setColor(Color.CYAN);
@@ -148,7 +148,7 @@ public class SettingsState implements GameState {
                     g.setColor(Color.WHITE);
                 }
             }
-            g.drawString(actionDisplayName + keyName, clickArea.x + 10, clickArea.y + fmKeybindItem.getAscent() + (KEYBIND_ITEM_HEIGHT - fmKeybindItem.getHeight())/2 );
+            g.drawString(actionDisplayName + keyName, clickArea.x + 10, clickArea.y + fmKeybindItem.getAscent() + (KEYBIND_ITEM_HEIGHT - fmKeybindItem.getHeight()) / 2);
         }
 
         if (inputHandler.isListening()) {

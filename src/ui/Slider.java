@@ -79,17 +79,12 @@ public class Slider {
     }
 
     public void render(Graphics2D g) {
-        // Uložíme původní nastavení anti-aliasingu (volitelné, ale dobrá praxe)
         Object originalTextAntialiasing = g.getRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING);
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
         g.setColor(Color.WHITE);
         g.setFont(new Font("Arial", Font.PLAIN, 18));
         g.drawString(label + ": " + currentValue + "%", x, y - 5);
-
-        // Obnovíme původní nastavení (pokud jsme ho uložili)
-        // g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, originalTextAntialiasing);
-        // Pro jednoduchost můžeme nechat zapnuté, pokud další kreslení v této metodě není text.
 
         g.setColor(Color.GRAY);
         g.fillRect(x, y, width, height);
