@@ -23,8 +23,7 @@ public class Slider {
         this.maxValue = maxValue;
         this.knobWidth = 10;
         this.knobHeight = sliderTrackHeight + 10;
-        int sliderBoundsY = y + sliderTrackHeight / 2 - knobHeight / 2;
-        this.sliderBounds = new Rectangle(x, sliderBoundsY, width, knobHeight);
+        this.sliderBounds = new Rectangle(x, y + (height / 2) - (knobHeight / 2), width, knobHeight);
         this.knobBounds = new Rectangle(0, 0, this.knobWidth, this.knobHeight);
         setValue(initialValue);
     }
@@ -52,28 +51,36 @@ public class Slider {
         knobBounds.y = y + height / 2 - knobHeight / 2;
     }
 
+
     public void handleMouseInput(int mouseX, int mouseY, boolean mouseIsPressed) {
+        Rectangle clickDetectionArea = new Rectangle(x, y + height / 2 - knobHeight / 2, width, knobHeight);
+
         if (mouseIsPressed) {
-            if (!dragging && sliderBounds.contains(mouseX, mouseY)) {
+            if (!dragging && clickDetectionArea.contains(mouseX, mouseY)) {
                 dragging = true;
                 updateValueFromMouse(mouseX);
             }
         } else {
             dragging = false;
         }
+
         if (dragging) {
             updateValueFromMouse(mouseX);
         }
     }
 
     private void updateValueFromMouse(int mouseX) {
-        int relativeMouseX = Math.max(0, Math.min(mouseX - this.x, this.width));
+        int effectiveMouseX = mouseX - (x + knobWidth / 2);
+        int availableTrackWidth = width - knobWidth;
+
         float percentage;
-        if (this.width == 0) {
+        if (availableTrackWidth <= 0) {
             percentage = 0;
         } else {
-            percentage = (float) relativeMouseX / this.width;
+            effectiveMouseX = Math.max(0, Math.min(effectiveMouseX, availableTrackWidth));
+            percentage = (float) effectiveMouseX / availableTrackWidth;
         }
+
         int newValue = minValue + (int) (percentage * (maxValue - minValue));
         setValue(newValue);
     }
@@ -90,9 +97,18 @@ public class Slider {
         g.fillRect(x, y, width, height);
         g.setColor(Color.DARK_GRAY);
         g.drawRect(x, y, width, height);
+
         g.setColor(Color.LIGHT_GRAY);
         g.fillRect(knobBounds.x, knobBounds.y, knobBounds.width, knobBounds.height);
         g.setColor(Color.WHITE);
         g.drawRect(knobBounds.x, knobBounds.y, knobBounds.width, knobBounds.height);
+
+        if (originalTextAntialiasing != null) {
+            g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, originalTextAntialiasing);
+        }
+    }
+
+    public boolean isDragging() {
+        return dragging;
     }
 }

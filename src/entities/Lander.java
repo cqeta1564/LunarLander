@@ -1,5 +1,7 @@
 package entities;
 
+import audio.AudioManager;
+
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.geom.AffineTransform;
@@ -44,7 +46,6 @@ public class Lander {
 
     private static final double THRUSTER_RAMP_UP_PER_SECOND = 0.75;
     private static final double THRUSTER_RAMP_DOWN_PER_SECOND = 1.5;
-
     private static final int FLAME_MIN_LENGTH = 5;
     private static final int FLAME_MAX_LENGTH = 20;
     private static final double FLAME_BASE_WIDTH_RATIO = 0.6;
@@ -54,6 +55,7 @@ public class Lander {
     public static boolean DEBUG_INFINITE_TOLERANCE_LANDING = false;
     private final Point2D.Double[] collisionPointsLocalFeet;
     private final Point2D.Double collisionPointLocalTip;
+    private boolean engineSoundPlaying = false;
     private State currentState;
     private int calculatedScore = 0;
     private double fuel;
@@ -64,6 +66,7 @@ public class Lander {
     private double currentThrustOutput = 0.0;
     private int rotationDirection = 0;
     private BufferedImage landerImage;
+
     public Lander(float startX, float startY) {
         try {
             landerImage = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/image_dc65d1.png")));
@@ -78,6 +81,8 @@ public class Lander {
     }
 
     public void reset(float startX, float startY) {
+        this.engineSoundPlaying = false;
+        AudioManager.getInstance().stopSound(AudioManager.SoundEffect.ENGINE);
         this.x = startX;
         this.y = startY;
         this.vx = INITIAL_FLYOVER_SPEED_X_PIXELS_S;
@@ -168,6 +173,28 @@ public class Lander {
         y += vy * deltaTime;
 
         checkCollisions(terrain);
+
+        AudioManager audioManager = AudioManager.getInstance();
+        boolean thrustShouldBeActive = playerRequestsThrust && fuel > 0 && currentThrustOutput > 0.05;
+
+        if (currentState == State.PLAYER_CONTROL || currentState == State.INITIAL_FLYOVER) {
+            if (thrustShouldBeActive) {
+                if (!engineSoundPlaying) {
+                    audioManager.loopSound(AudioManager.SoundEffect.ENGINE);
+                    engineSoundPlaying = true;
+                }
+            } else {
+                if (engineSoundPlaying) {
+                    audioManager.stopSound(AudioManager.SoundEffect.ENGINE);
+                    engineSoundPlaying = false;
+                }
+            }
+        } else {
+            if (engineSoundPlaying) {
+                audioManager.stopSound(AudioManager.SoundEffect.ENGINE);
+                engineSoundPlaying = false;
+            }
+        }
     }
 
     public Point2D.Double getPointInWorldSpace(Point2D.Double localPoint) {
@@ -272,6 +299,19 @@ public class Lander {
             playerRequestsThrust = false;
             currentThrustOutput = 0.0;
             rotationDirection = 0;
+        }
+
+        if (engineSoundPlaying && (currentState == State.CRASHED || currentState == State.LANDED_GENTLE || currentState == State.LANDED_HARD)) {
+            AudioManager.getInstance().stopSound(AudioManager.SoundEffect.ENGINE);
+            engineSoundPlaying = false;
+        }
+
+        if (currentState == State.CRASHED) {
+            AudioManager.getInstance().playSound(AudioManager.SoundEffect.LUNAR_EXPLOSION);
+        } else if (currentState == State.LANDED_GENTLE || currentState == State.LANDED_HARD) {
+            if (this.fuel <= 0) {
+                AudioManager.getInstance().playSound(AudioManager.SoundEffect.PLAYER_DEAD);
+            }
         }
     }
 

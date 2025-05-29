@@ -1,5 +1,6 @@
 package states;
 
+import audio.AudioManager;
 import core.Game;
 import input.InputHandler;
 
@@ -31,10 +32,17 @@ public class MenuState implements GameState {
     @Override
     public void handleInput() {
         if (inputHandler.isEnterJustPressed()) {
+            AudioManager.getInstance().playSound(AudioManager.SoundEffect.BUTTON_CLICK);
             stateManager.setState(StateManager.StateType.PLAYING);
         } else if (inputHandler.isSKeyJustPressed()) {
+            AudioManager.getInstance().playSound(AudioManager.SoundEffect.BUTTON_CLICK);
             stateManager.setState(StateManager.StateType.SETTINGS);
         } else if (inputHandler.isEscJustPressed()) {
+            AudioManager.getInstance().playSound(AudioManager.SoundEffect.BUTTON_CLICK);
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException ignored) {
+            }
             System.exit(0);
         }
     }

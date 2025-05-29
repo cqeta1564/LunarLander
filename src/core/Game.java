@@ -1,5 +1,6 @@
 package core;
 
+import audio.AudioManager;
 import input.InputHandler;
 import states.StateManager;
 
@@ -40,6 +41,7 @@ public class Game implements Runnable {
             System.err.println("Game thread interrupted during stop: " + e.getMessage());
             Thread.currentThread().interrupt();
         }
+        AudioManager.getInstance().shutdown();
     }
 
     @Override
@@ -110,7 +112,7 @@ public class Game implements Runnable {
     private void renderGame() {
         Graphics2D g = window.getGraphicsContext();
         if (g != null) {
-            g.setColor(Color.BLACK); // Barva pozadí, pokud terén nekryje vše
+            g.setColor(Color.BLACK);
             g.fillRect(0, 0, window.getWidth(), window.getHeight());
             if (stateManager.getCurrentState() != null) {
                 stateManager.getCurrentState().render(g);

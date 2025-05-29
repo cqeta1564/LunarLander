@@ -68,9 +68,19 @@ public class SettingsState implements GameState {
     @Override
     public void update(double deltaTime) {
         handleInput();
-        int sliderVolume = volumeSlider.getValue();
-        if (sliderVolume != audioManager.getGlobalVolume()) {
-            audioManager.setGlobalVolume(sliderVolume);
+
+        if (stateManager.getCurrentState() == this && !inputHandler.isListening()) {
+            int previousSliderDiscreteValue = volumeSlider.getValue();
+            volumeSlider.handleMouseInput(inputHandler.mouseX, inputHandler.mouseY, inputHandler.mouseLeftPressed);
+            int currentSliderDiscreteValue = volumeSlider.getValue();
+
+            if (volumeSlider.isDragging() && inputHandler.mouseLeftPressed && currentSliderDiscreteValue != previousSliderDiscreteValue) {
+                AudioManager.getInstance().playSound(AudioManager.SoundEffect.BUTTON_CLICK);
+            }
+
+            if (audioManager != null && currentSliderDiscreteValue != audioManager.getGlobalVolume()) {
+                audioManager.setGlobalVolume(currentSliderDiscreteValue);
+            }
         }
     }
 
@@ -83,7 +93,6 @@ public class SettingsState implements GameState {
             if (rawKeyCode != KeyEvent.VK_UNDEFINED) {
                 GameAction actionBeingRebound = inputHandler.getActionBeingRebound();
                 if (rawKeyCode == KeyEvent.VK_ESCAPE) {
-                    // Zrušení rebindu
                 } else {
                     if (actionBeingRebound != null) {
                         keyBindings.setKey(actionBeingRebound, rawKeyCode);
@@ -94,15 +103,23 @@ public class SettingsState implements GameState {
             }
         } else {
             if (inputHandler.isMouseLeftJustPressed()) {
+                boolean clickedOnBindable = false;
                 for (int i = 0; i < GameAction.getAllActions().length; i++) {
                     if (keyBindClickAreas.get(i).contains(inputHandler.mouseX, inputHandler.mouseY)) {
+                        AudioManager.getInstance().playSound(AudioManager.SoundEffect.BUTTON_CLICK);
                         currentlySelectedActionToRebind = GameAction.getAllActions()[i];
                         inputHandler.startListeningForKey(currentlySelectedActionToRebind);
-                        return;
+                        clickedOnBindable = true;
+                        break;
                     }
                 }
+                if (clickedOnBindable) {
+                    return;
+                }
             }
+
             if (inputHandler.isEscJustPressed()) {
+                AudioManager.getInstance().playSound(AudioManager.SoundEffect.BUTTON_CLICK);
                 stateManager.setState(StateManager.StateType.MENU);
             }
         }

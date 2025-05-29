@@ -1,5 +1,6 @@
 package states;
 
+import audio.AudioManager;
 import core.Game;
 import entities.Lander;
 import entities.Terrain;
@@ -377,6 +378,7 @@ public class PlayingState implements GameState {
     @Override
     public void onExit() {
         System.out.println("Opuštění PlayingState.");
+        AudioManager.getInstance().stopSound(AudioManager.SoundEffect.ENGINE);
         if (lander != null) {
             lander.setPlayerRequestsThrust(false);
             lander.setRotation(0);
