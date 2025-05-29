@@ -77,6 +77,7 @@ public class Lander {
 
         collisionPointsLocalFeet = new Point2D.Double[]{new Point2D.Double(-DISPLAY_LANDER_WIDTH / 2.0 * LANDING_GEAR_WIDTH_FACTOR, LANDING_GEAR_Y_OFFSET), new Point2D.Double(DISPLAY_LANDER_WIDTH / 2.0 * LANDING_GEAR_WIDTH_FACTOR, LANDING_GEAR_Y_OFFSET)};
         collisionPointLocalTip = new Point2D.Double(0, -DISPLAY_LANDER_HEIGHT / 2.0);
+        this.fuel = MAX_FUEL;
         reset(startX, startY);
     }
 
@@ -306,9 +307,7 @@ public class Lander {
             engineSoundPlaying = false;
         }
 
-        if (currentState == State.CRASHED) {
-            AudioManager.getInstance().playSound(AudioManager.SoundEffect.LUNAR_EXPLOSION);
-        } else if (currentState == State.LANDED_GENTLE || currentState == State.LANDED_HARD) {
+        if (currentState == State.LANDED_GENTLE || currentState == State.LANDED_HARD) {
             if (this.fuel <= 0) {
                 AudioManager.getInstance().playSound(AudioManager.SoundEffect.PLAYER_DEAD);
             }
@@ -391,6 +390,10 @@ public class Lander {
 
     public double getFuel() {
         return fuel;
+    }
+
+    public void setFuel(double fuelAmount) {
+        this.fuel = Math.max(0, Math.min(fuelAmount, MAX_FUEL));
     }
 
     public enum State {

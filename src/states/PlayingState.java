@@ -42,7 +42,7 @@ public class PlayingState implements GameState {
     private String landingMessageDisplay = "";
     private double totalTimePlayedInStateSeconds = 0;
     private float currentHeightAboveTerrain = 0;
-
+    private double fuelForNextAttempt = Lander.MAX_FUEL;
 
     public PlayingState(StateManager stateManager, InputHandler inputHandler) {
         this.stateManager = stateManager;
@@ -70,9 +70,14 @@ public class PlayingState implements GameState {
 
         if (this.lander == null) {
             this.lander = new Lander(startX, startY);
+            this.lander.setFuel(fuelForNextAttempt);
         } else {
             lander.reset(startX, startY);
+            lander.setFuel(fuelForNextAttempt);
         }
+
+        fuelForNextAttempt = Lander.MAX_FUEL;
+
         playerControlTakenSinceEnter = false;
         currentZoom = ZOOM_LEVEL_OUT;
         targetZoom = ZOOM_LEVEL_OUT;
@@ -108,8 +113,12 @@ public class PlayingState implements GameState {
         } else {
             if (inputHandler.isEscJustPressed()) {
                 stateManager.setState(StateManager.StateType.MENU);
-            } else if (lander != null && (lander.getCurrentState() == Lander.State.LANDED_GENTLE || lander.getCurrentState() == Lander.State.LANDED_HARD) && lander.getFuel() > 0 && inputHandler.isEnterJustPressed()) {
-                onEnter();
+            } else if (inputHandler.isEnterJustPressed()) {
+                if (lander != null && (lander.getCurrentState() == Lander.State.LANDED_GENTLE || lander.getCurrentState() == Lander.State.LANDED_HARD || lander.getCurrentState() == Lander.State.CRASHED) && lander.getFuel() > 0) {
+
+                    fuelForNextAttempt = lander.getFuel();
+                    onEnter();
+                }
             }
         }
 
@@ -187,50 +196,31 @@ public class PlayingState implements GameState {
             switch (lState) {
                 case LANDED_GENTLE:
                     landingMessageDisplay = "Perfektní přistání!";
+                    if (lander.getFuel() <= 0) {
+                        landingMessageDisplay += " .. ale došlo palivo!";
+                    }
                     break;
                 case LANDED_HARD:
                     landingMessageDisplay = "Tvrdé přistání!";
+                    if (lander.getFuel() <= 0) {
+                        landingMessageDisplay += " .. ale došlo palivo!";
+                    }
                     break;
                 case CRASHED:
                     landingMessageDisplay = "Havárie!";
+                    // Pokud po havárii dojde palivo, tato zpráva se zobrazí
+                    // a následně se zobrazí pouze možnost "ESC pro menu", protože lander.getFuel() <= 0
+                    if (lander.getFuel() <= 0) {
+                        landingMessageDisplay += " .. a palivo také došlo!";
+                    }
                     break;
                 default:
                     landingMessageDisplay = "Pokus ukončen.";
+                    if (lander.getFuel() <= 0) {
+                        landingMessageDisplay += " .. palivo došlo.";
+                    }
                     break;
             }
-            if (lander.getFuel() <= 0 && lState != Lander.State.CRASHED) {
-                landingMessageDisplay += " .. ale došlo palivo!";
-            }
-        }
-    }
-
-    @Override
-    public void handleInput() {
-        if (attemptConcluded) return;
-        if (inputHandler.isEscJustPressed()) {
-            stateManager.setState(StateManager.StateType.MENU);
-            return;
-        }
-        if (lander == null) return;
-
-        boolean actionKeyPressed = false;
-        int rotation = 0;
-        if (inputHandler.isActionActive(GameAction.ROTATE_LEFT)) {
-            rotation = -1;
-            actionKeyPressed = true;
-        } else if (inputHandler.isActionActive(GameAction.ROTATE_RIGHT)) {
-            rotation = 1;
-            actionKeyPressed = true;
-        }
-        lander.setRotation(rotation);
-
-        boolean thrusting = inputHandler.isActionActive(GameAction.THRUST);
-        if (thrusting) actionKeyPressed = true;
-        lander.setPlayerRequestsThrust(thrusting);
-
-        if (actionKeyPressed && !playerControlTakenSinceEnter) {
-            lander.playerHasTakenControl();
-            playerControlTakenSinceEnter = true;
         }
     }
 
@@ -364,7 +354,9 @@ public class PlayingState implements GameState {
             g2d.setFont(GAME_OVER_FONT_SMALL);
             fm = g2d.getFontMetrics();
             String continueMsg;
-            if (lander != null && (lander.getCurrentState() == Lander.State.LANDED_GENTLE || lander.getCurrentState() == Lander.State.LANDED_HARD) && lander.getFuel() > 0) {
+            boolean canContinueWithEnter = lander != null && (lander.getCurrentState() == Lander.State.LANDED_GENTLE || lander.getCurrentState() == Lander.State.LANDED_HARD || lander.getCurrentState() == Lander.State.CRASHED) && lander.getFuel() > 0;
+
+            if (canContinueWithEnter) {
                 continueMsg = "Stiskni ENTER pro pokračování | ESC pro menu";
             } else {
                 continueMsg = "Stiskni ESC pro návrat do menu";
@@ -372,6 +364,36 @@ public class PlayingState implements GameState {
             textWidth = fm.stringWidth(continueMsg);
             g2d.setColor(Color.LIGHT_GRAY);
             g2d.drawString(continueMsg, (Game.DEFAULT_WIDTH - textWidth) / 2, Game.DEFAULT_HEIGHT / 2 + 40);
+        }
+    }
+
+    @Override
+    public void handleInput() {
+        if (attemptConcluded) return;
+        if (inputHandler.isEscJustPressed()) {
+            stateManager.setState(StateManager.StateType.MENU);
+            return;
+        }
+        if (lander == null) return;
+
+        boolean actionKeyPressed = false;
+        int rotation = 0;
+        if (inputHandler.isActionActive(GameAction.ROTATE_LEFT)) {
+            rotation = -1;
+            actionKeyPressed = true;
+        } else if (inputHandler.isActionActive(GameAction.ROTATE_RIGHT)) {
+            rotation = 1;
+            actionKeyPressed = true;
+        }
+        lander.setRotation(rotation);
+
+        boolean thrusting = inputHandler.isActionActive(GameAction.THRUST);
+        if (thrusting) actionKeyPressed = true;
+        lander.setPlayerRequestsThrust(thrusting);
+
+        if (actionKeyPressed && !playerControlTakenSinceEnter) {
+            lander.playerHasTakenControl();
+            playerControlTakenSinceEnter = true;
         }
     }
 
