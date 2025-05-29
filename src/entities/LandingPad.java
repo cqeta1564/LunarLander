@@ -15,9 +15,7 @@ public class LandingPad {
         this.screenY = screenY;
         this.multiplier = multiplier;
 
-        if (multiplier >= 8) this.color = new Color(255, 100, 100, 200);
-        else if (multiplier >= 5) this.color = new Color(255, 180, 100, 200);
-        else this.color = new Color(100, 255, 100, 200);
+        this.color = new Color(255, 255, 255, 200);
     }
 
     public float getStartX() {

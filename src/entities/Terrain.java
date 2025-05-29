@@ -8,6 +8,7 @@ import java.util.List;
 public class Terrain {
     private static final float X_AXIS_SHRINK_FACTOR = 1f;
     private static final float Y_AXIS_SHRINK_FACTOR = 2.0f;
+    private static final double PAD_SPAWN_PROBABILITY = 0.6;
     private static final float TERRAIN_VIEWPORT_TOP_Y_RATIO = 0.40f;
     private static final float TERRAIN_VIEWPORT_BOTTOM_Y_RATIO = 0.95f;
     private static final String RAW_TERRAIN_DATA = "0,1429 45,1429 60,1367 60,1340 76,1340 83,1315 98,1299 105,1287 108,1276 118,1261 134,1261 148,1204 163,1198 178,1211 207,1211 222,1198 228,1169 237,1140 253,1134 254,1122 266,1108 280,1096 298,1096 301,1108 316,1109 318,1122 327,1122 330,1160 341,1197 342,1213 348,1236 372,1249 379,1279 385,1289 399,1300 416,1300 429,1289 437,1277 444,1266 455,1254 465,1244 475,1236 481,1224 496,1210 501,1198 517,1192 532,1174 548,1169 560,1159 577,1159 592,1163 606,1173 609,1184 620,1198 625,1211 635,1224 637,1236 649,1250 666,1249 676,1225 686,1218 698,1224 709,1236 716,1262 737,1275 742,1316 752,1351 752,1366 766,1377 796,1378 812,1366 826,1353 833,1339 848,1327 854,1315 869,1308 884,1251 899,1244 909,1234 917,1225 924,1216 930,1207 936,1196 943,1185 951,1159 965,1147 972,1134 976,1123 986,1109 1003,1108 1017,1096 1025,1083 1031,1073 1045,1058 1060,997 1061,962 1064,941 1073,916 1074,910 1089,903 1095,889 1103,877 1119,877 1122,890 1138,890 1142,904 1149,904 1159,909 1165,916 1170,922 1178,947 1201,962 1221,1017 1237,1022 1252,1032 1254,1044 1266,1058 1269,1069 1279,1082 1296,1083 1298,1123 1309,1158 1310,1173 1324,1173 1328,1186 1339,1196 1342,1209 1344,1216 1346,1223 1349,1228 1353,1235 1369,1249 1372,1289 1382,1325 1382,1340 1386,1351 1397,1365 1413,1365 1419,1390 1425,1399 1456,1428 1573,1428 1582,1390 1596,1366 1603,1339 1611,1339 1622,1314 1634,1304 1647,1288 1663,1283 1675,1274 1691,1274 1714,1333 1716,1345 1734,1362 1738,1364 1748,1376 1756,1403 1778,1417 1840,1419 1867,1428 1879,1429";
@@ -123,6 +124,24 @@ public class Terrain {
         float pC_screenY = targetScreenTopY + (pC_normY * targetScreenDisplayHeight);
         basePatternPadDefinitions.add(new LandingPad.PatternPadDefinition((1456 / X_AXIS_SHRINK_FACTOR), (1573 / X_AXIS_SHRINK_FACTOR), 1428, 2, pC_screenY));
 
+        float rawY_P2 = 1211f;
+        float normY_P2 = (rawY_P2 - minRawY) / rawYRange;
+        float screenY_P2 = targetScreenTopY + (normY_P2 * targetScreenDisplayHeight);
+        basePatternPadDefinitions.add(new LandingPad.PatternPadDefinition(
+                (178 / X_AXIS_SHRINK_FACTOR), (207 / X_AXIS_SHRINK_FACTOR), (int) rawY_P2, 4, screenY_P2));
+
+        float rawY_P6 = 890f;
+        float normY_P6 = (rawY_P6 - minRawY) / rawYRange;
+        float screenY_P6 = targetScreenTopY + (normY_P6 * targetScreenDisplayHeight);
+        basePatternPadDefinitions.add(new LandingPad.PatternPadDefinition(
+                (1122 / X_AXIS_SHRINK_FACTOR), (1138 / X_AXIS_SHRINK_FACTOR), (int) rawY_P6, 6, screenY_P6));
+
+        float rawY_P4 = 1300f;
+        float normY_P4 = (rawY_P4 - minRawY) / rawYRange;
+        float screenY_P4 = targetScreenTopY + (normY_P4 * targetScreenDisplayHeight);
+        basePatternPadDefinitions.add(new LandingPad.PatternPadDefinition(
+                (399 / X_AXIS_SHRINK_FACTOR), (416 / X_AXIS_SHRINK_FACTOR), (int) rawY_P4, 3, screenY_P4));
+
         System.out.println("Ploška A (screen Y - invertovaná): " + pA_screenY);
         System.out.println("Ploška B (screen Y - invertovaná, měla by být nahoře v pásmu): " + pB_screenY);
         System.out.println("Ploška C (screen Y - invertovaná, měla by být dole v pásmu): " + pC_screenY);
@@ -160,12 +179,15 @@ public class Terrain {
                 }
             }
             for (LandingPad.PatternPadDefinition def : basePatternPadDefinitions) {
-                float padWorldStartX = currentPatternCycleWorldXStart + def.patternStartX;
-                float padWorldEndX = currentPatternCycleWorldXStart + def.patternEndX;
-                float padScreenStartX = padWorldStartX - worldXOffset;
-                float padScreenEndX = padWorldEndX - worldXOffset;
-                if (padScreenEndX >= 0 && padScreenStartX <= viewWidth) {
-                    landingPads.add(new LandingPad(padScreenStartX, padScreenEndX, def.transformedScreenY, def.multiplier));
+                if (Math.random() < PAD_SPAWN_PROBABILITY) {
+                    float padWorldStartX = currentPatternCycleWorldXStart + def.patternStartX;
+                    float padWorldEndX = currentPatternCycleWorldXStart + def.patternEndX;
+                    float padScreenStartX = padWorldStartX - worldXOffset;
+                    float padScreenEndX = padWorldEndX - worldXOffset;
+
+                    if (padScreenEndX >= 0 && padScreenStartX <= viewWidth) {
+                        landingPads.add(new LandingPad(padScreenStartX, padScreenEndX, def.transformedScreenY, def.multiplier));
+                    }
                 }
             }
         }
