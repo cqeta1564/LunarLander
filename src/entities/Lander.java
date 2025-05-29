@@ -345,7 +345,7 @@ public class Lander {
 
         if (currentThrustOutput > 0.05 && (currentState == State.PLAYER_CONTROL || currentState == State.INITIAL_FLYOVER)) {
             float flameBaseY = DISPLAY_LANDER_HEIGHT / 2.0f;
-            float flameBaseHalfWidth = (DISPLAY_LANDER_WIDTH * (float) FLAME_BASE_WIDTH_RATIO) / 2.0f;
+            float flameBaseHalfWidth = (DISPLAY_LANDER_WIDTH * (float) FLAME_BASE_WIDTH_RATIO) / 3.5f;
             float flameTipLength = (float) (FLAME_MIN_LENGTH + (FLAME_MAX_LENGTH - FLAME_MIN_LENGTH) * currentThrustOutput);
             flameTipLength += (Math.random() * 5.0f - 2.5f) * currentThrustOutput;
             flameTipLength = Math.max(0, flameTipLength);

@@ -320,7 +320,7 @@ public class PlayingState implements GameState {
 
         String heightString = "VÝŠKA: N/A";
         if (lander != null && (lander.getCurrentState() == Lander.State.PLAYER_CONTROL || lander.getCurrentState() == Lander.State.INITIAL_FLYOVER) && currentHeightAboveTerrain != Float.POSITIVE_INFINITY) {
-            heightString = String.format("VÝŠKA: %.0fpx", currentHeightAboveTerrain);
+            heightString = String.format("VÝŠKA: %.0f", currentHeightAboveTerrain);
         }
         int textWidth = g2d.getFontMetrics(HUD_FONT).stringWidth(heightString);
         g2d.drawString(heightString, hudRX - textWidth, hudLY);
