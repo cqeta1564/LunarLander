@@ -13,10 +13,10 @@ import java.util.Objects;
 public class Lander {
     public static final double INITIAL_FLYOVER_SPEED_X_PIXELS_S = 60;
     public static final float INITIAL_FLYOVER_START_Y_RATIO = 0.15f;
+    public static final double PIXELS_PER_METER = 20.0;
     public static final int ORIGINAL_LANDER_IMAGE_WIDTH = 36;
     public static final int ORIGINAL_LANDER_IMAGE_HEIGHT = 31;
     public static final double MAX_FUEL = 1000.0;
-    private static final double PIXELS_PER_METER = 20.0;
     private static final double LUNAR_GRAVITY_MS2 = 1.625;
     private static final double LUNAR_GRAVITY_PIXELS_S2 = LUNAR_GRAVITY_MS2 * PIXELS_PER_METER;
     private static final double MAIN_THRUSTER_ACCELERATION_MS2 = 3.0;
@@ -64,7 +64,6 @@ public class Lander {
     private double currentThrustOutput = 0.0;
     private int rotationDirection = 0;
     private BufferedImage landerImage;
-
     public Lander(float startX, float startY) {
         try {
             landerImage = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/image_dc65d1.png")));
@@ -127,7 +126,7 @@ public class Lander {
         if (playerRequestsThrust && fuel > 0) {
             currentThrustOutput += THRUSTER_RAMP_UP_PER_SECOND * deltaTime;
             if (currentThrustOutput > 1.0) currentThrustOutput = 1.0;
-        } else { // Hráč nechce tah NEBO došlo palivo
+        } else {
             currentThrustOutput -= THRUSTER_RAMP_DOWN_PER_SECOND * deltaTime;
             if (currentThrustOutput < 0.0) currentThrustOutput = 0.0;
             if (fuel <= 0) playerRequestsThrust = false;
@@ -143,12 +142,13 @@ public class Lander {
             }
         }
 
-
         double ax = 0;
         double ay = 0;
 
         if (currentState == State.INITIAL_FLYOVER) {
             ay += LUNAR_GRAVITY_PIXELS_S2;
+            if (terrain != null && x > terrain.getScreenWidth() + DISPLAY_LANDER_WIDTH * 2) {
+            }
         } else if (currentState == State.PLAYER_CONTROL) {
             ay += LUNAR_GRAVITY_PIXELS_S2;
             if (currentThrustOutput > 0) {
@@ -170,7 +170,7 @@ public class Lander {
         checkCollisions(terrain);
     }
 
-    private Point2D.Double getPointInWorldSpace(Point2D.Double localPoint) {
+    public Point2D.Double getPointInWorldSpace(Point2D.Double localPoint) {
         double c = Math.cos(angle);
         double s = Math.sin(angle);
         double worldX = x + (localPoint.x * c - localPoint.y * s);
@@ -242,15 +242,16 @@ public class Lander {
                 if (fuel < 0) fuel = 0;
             } else {
                 this.angle = 0;
-                float qualityVy = 1.0f - (float) Math.max(0, (absVy - PERFECT_LANDING_SPEED_Y) / (CRASH_LIMIT_SPEED_Y - PERFECT_LANDING_SPEED_Y));
-                qualityVy = Math.max(0, Math.min(1, qualityVy));
-                float qualityVx = 1.0f - (float) Math.max(0, (absVx - PERFECT_LANDING_SPEED_X) / (CRASH_LIMIT_SPEED_X - PERFECT_LANDING_SPEED_X));
-                qualityVx = Math.max(0, Math.min(1, qualityVx));
-                float qualityAngle = 1.0f - (float) Math.max(0, (absAngleDeg - PERFECT_LANDING_ANGLE_DEG) / (CRASH_LIMIT_ANGLE_DEG - PERFECT_LANDING_ANGLE_DEG));
-                qualityAngle = Math.max(0, Math.min(1, qualityAngle));
+                float qualityVy = 1.0f - (float) Math.max(0, Math.min(1, (absVy - PERFECT_LANDING_SPEED_Y) / (CRASH_LIMIT_SPEED_Y - PERFECT_LANDING_SPEED_Y)));
+                float qualityVx = 1.0f - (float) Math.max(0, Math.min(1, (absVx - PERFECT_LANDING_SPEED_X) / (CRASH_LIMIT_SPEED_X - PERFECT_LANDING_SPEED_X)));
+                float qualityAngle = 1.0f - (float) Math.max(0, Math.min(1, (absAngleDeg - PERFECT_LANDING_ANGLE_DEG) / (CRASH_LIMIT_ANGLE_DEG - PERFECT_LANDING_ANGLE_DEG)));
+
                 float overallQuality = (qualityVy + qualityVx + qualityAngle) / 3.0f;
+                if (Float.isNaN(overallQuality) || Float.isInfinite(overallQuality)) overallQuality = 0f;
+
                 float baseScore = overallQuality * MAX_BASE_SCORE_FOR_QUALITY_1;
                 int multiplier = (contactPad != null) ? contactPad.getMultiplier() : 1;
+
                 int finalScore = Math.round(baseScore * multiplier);
                 finalScore = Math.max(MIN_SCORE_FOR_SUCCESSFUL_LANDING, finalScore);
                 finalScore = Math.min(finalScore, MAX_SCORE_OVERALL_CAP);

@@ -5,10 +5,10 @@ import entities.Lander;
 import entities.Terrain;
 import input.GameAction;
 import input.InputHandler;
-import input.KeyBindings;
 
 import java.awt.*;
 import java.awt.geom.AffineTransform;
+import java.awt.geom.Point2D;
 import java.util.List;
 
 public class PlayingState implements GameState {
@@ -21,6 +21,13 @@ public class PlayingState implements GameState {
     private static final float DISTANCE_TO_ZOOM_IN_THRESHOLD = 100.0f;
     private static final float DISTANCE_TO_ZOOM_OUT_THRESHOLD = 150.0f;
     private static final float ZOOM_INTERPOLATION_SPEED = 2.0f;
+    private static final int HUD_MARGIN_X = 15;
+    private static final int HUD_MARGIN_Y = 20;
+    private static final int HUD_LINE_SPACING = 18;
+    private static final Font HUD_FONT = new Font("Monospaced", Font.BOLD, 14);
+    private static final Font GAME_OVER_FONT_BIG = new Font("Arial", Font.BOLD, 48);
+    private static final Font GAME_OVER_FONT_MEDIUM = new Font("Arial", Font.BOLD, 32);
+    private static final Font GAME_OVER_FONT_SMALL = new Font("Arial", Font.PLAIN, 20);
     private final StateManager stateManager;
     private final InputHandler inputHandler;
     private Terrain terrain;
@@ -32,6 +39,9 @@ public class PlayingState implements GameState {
     private float targetZoom = 1.0f;
     private boolean attemptConcluded = false;
     private String landingMessageDisplay = "";
+    private double totalTimePlayedInStateSeconds = 0;
+    private float currentHeightAboveTerrain = 0;
+
 
     public PlayingState(StateManager stateManager, InputHandler inputHandler) {
         this.stateManager = stateManager;
@@ -50,6 +60,9 @@ public class PlayingState implements GameState {
         }
         this.cameraX = 0;
         this.targetCameraX = 0;
+        if (terrain != null) {
+            this.terrain.populateVisibleTerrain(cameraX, Game.DEFAULT_WIDTH);
+        }
 
         float startY = Game.DEFAULT_HEIGHT * Lander.INITIAL_FLYOVER_START_Y_RATIO;
         float startX = this.cameraX - Lander.DISPLAY_LANDER_WIDTH;
@@ -64,10 +77,8 @@ public class PlayingState implements GameState {
         targetZoom = ZOOM_LEVEL_OUT;
         attemptConcluded = false;
         landingMessageDisplay = "";
-
-        if (terrain != null) {
-            terrain.populateVisibleTerrain(this.cameraX, Game.DEFAULT_WIDTH);
-        }
+        totalTimePlayedInStateSeconds = 0;
+        currentHeightAboveTerrain = 0;
     }
 
     @Override
@@ -76,12 +87,13 @@ public class PlayingState implements GameState {
 
         if (!attemptConcluded) {
             handleInput();
+            totalTimePlayedInStateSeconds += deltaTime;
             if (lander != null) {
                 lander.update(deltaTime, terrain);
                 checkLanderStatusAndScore();
 
-                if (lander.getCurrentState() == Lander.State.PLAYER_CONTROL || lander.getCurrentState() == Lander.State.INITIAL_FLYOVER) {
-                    float landerScreenX = (float) lander.getX() - this.cameraX;
+                if (terrain != null && (lander.getCurrentState() == Lander.State.PLAYER_CONTROL || lander.getCurrentState() == Lander.State.INITIAL_FLYOVER)) {
+                    float landerScreenX = (float) lander.getX() - cameraX;
                     float scrollTriggerX = Game.DEFAULT_WIDTH * SCROLL_THRESHOLD_RIGHT_FACTOR;
 
                     if (landerScreenX > scrollTriggerX) {
@@ -112,51 +124,58 @@ public class PlayingState implements GameState {
 
         if (lander != null && terrain != null && terrain.getTerrainSurfacePoints() != null && !terrain.getTerrainSurfacePoints().isEmpty() && (lander.getCurrentState() == Lander.State.PLAYER_CONTROL || lander.getCurrentState() == Lander.State.INITIAL_FLYOVER)) {
             double landerEffectiveScreenX = lander.getX() - cameraX;
-            double landerFeetWorldY = lander.getY() + (Lander.DISPLAY_LANDER_HEIGHT / 2.0);
-            float terrainYAtLanderX = -1;
-            List<Point> surfacePoints = terrain.getTerrainSurfacePoints();
+            Point2D.Double landerFootPointLocal = new Point2D.Double(0, Lander.DISPLAY_LANDER_HEIGHT / 2.0);
+            Point2D.Double landerFootPointWorld = lander.getPointInWorldSpace(landerFootPointLocal);
+            double landerFeetScreenY = landerFootPointWorld.y;
 
-            if (surfacePoints.size() > 1) {
-                Point p1 = null, p2 = null;
-                for (int i = 0; i < surfacePoints.size() - 1; i++) {
-                    if (surfacePoints.get(i).x <= landerEffectiveScreenX && surfacePoints.get(i + 1).x >= landerEffectiveScreenX) {
-                        p1 = surfacePoints.get(i);
-                        p2 = surfacePoints.get(i + 1);
-                        break;
-                    }
-                }
-                if (p1 == null && !surfacePoints.isEmpty() && landerEffectiveScreenX < surfacePoints.get(0).x) {
-                    p1 = new Point((int) (landerEffectiveScreenX - 10), surfacePoints.get(0).y);
-                    p2 = surfacePoints.get(0);
-                } else if (p1 == null && !surfacePoints.isEmpty() && landerEffectiveScreenX > surfacePoints.get(surfacePoints.size() - 1).x) {
-                    p1 = surfacePoints.get(surfacePoints.size() - 1);
-                    p2 = new Point((int) (landerEffectiveScreenX + 10), surfacePoints.get(surfacePoints.size() - 1).y);
-                }
+            float terrainYAtLanderX = calculateTerrainYAtScreenX((float) landerEffectiveScreenX, terrain.getTerrainSurfacePoints());
 
-                if (p1 != null && p2 != null) {
-                    if (p2.x == p1.x) {
-                        terrainYAtLanderX = Math.min(p1.y, p2.y);
-                    } else {
-                        float t = (p2.x - p1.x == 0) ? 0 : (float) (landerEffectiveScreenX - p1.x) / (float) (p2.x - p1.x);
-                        terrainYAtLanderX = p1.y + t * (p2.y - p1.y);
-                    }
-                    float distanceToSurface = terrainYAtLanderX - (float) landerFeetWorldY;
-                    if (distanceToSurface < DISTANCE_TO_ZOOM_IN_THRESHOLD && distanceToSurface >= -Lander.DISPLAY_LANDER_HEIGHT) {
-                        targetZoom = ZOOM_LEVEL_IN;
-                    } else if (distanceToSurface > DISTANCE_TO_ZOOM_OUT_THRESHOLD) {
-                        targetZoom = ZOOM_LEVEL_OUT;
-                    }
-                } else {
+            if (terrainYAtLanderX != -1) {
+                this.currentHeightAboveTerrain = terrainYAtLanderX - (float) landerFeetScreenY;
+                if (currentHeightAboveTerrain < DISTANCE_TO_ZOOM_IN_THRESHOLD && currentHeightAboveTerrain >= -Lander.DISPLAY_LANDER_HEIGHT) {
+                    targetZoom = ZOOM_LEVEL_IN;
+                } else if (currentHeightAboveTerrain > DISTANCE_TO_ZOOM_OUT_THRESHOLD) {
                     targetZoom = ZOOM_LEVEL_OUT;
                 }
             } else {
                 targetZoom = ZOOM_LEVEL_OUT;
+                this.currentHeightAboveTerrain = Float.POSITIVE_INFINITY;
             }
         } else if (lander != null && (lander.getCurrentState() == Lander.State.LANDED_GENTLE || lander.getCurrentState() == Lander.State.LANDED_HARD || lander.getCurrentState() == Lander.State.CRASHED)) {
             targetZoom = ZOOM_LEVEL_OUT;
         }
         currentZoom += (targetZoom - currentZoom) * ZOOM_INTERPOLATION_SPEED * deltaTime;
         currentZoom = Math.max(ZOOM_LEVEL_OUT, Math.min(currentZoom, ZOOM_LEVEL_IN * 1.05f));
+    }
+
+    private float calculateTerrainYAtScreenX(float screenX, List<Point> surfacePoints) {
+        if (surfacePoints == null || surfacePoints.size() < 2) {
+            return -1;
+        }
+        Point p1 = null, p2 = null;
+        for (int i = 0; i < surfacePoints.size() - 1; i++) {
+            if (surfacePoints.get(i).x <= screenX && surfacePoints.get(i + 1).x >= screenX) {
+                p1 = surfacePoints.get(i);
+                p2 = surfacePoints.get(i + 1);
+                break;
+            }
+        }
+        if (p1 == null && !surfacePoints.isEmpty()) {
+            if (screenX < surfacePoints.get(0).x) return surfacePoints.get(0).y;
+            if (screenX > surfacePoints.get(surfacePoints.size() - 1).x)
+                return surfacePoints.get(surfacePoints.size() - 1).y;
+            return -1;
+        }
+
+        if (p1 != null && p2 != null) {
+            if (p2.x == p1.x) {
+                return Math.min(p1.y, p2.y);
+            } else {
+                float t = (screenX - p1.x) / (float) (p2.x - p1.x);
+                return p1.y + t * (p2.y - p1.y);
+            }
+        }
+        return -1;
     }
 
     private void checkLanderStatusAndScore() {
@@ -186,9 +205,7 @@ public class PlayingState implements GameState {
 
     @Override
     public void handleInput() {
-        if (attemptConcluded) {
-            return;
-        }
+        if (attemptConcluded) return;
         if (inputHandler.isEscJustPressed()) {
             stateManager.setState(StateManager.StateType.MENU);
             return;
@@ -219,7 +236,7 @@ public class PlayingState implements GameState {
     @Override
     public void render(Graphics2D g) {
         Graphics2D g2d = g;
-        AffineTransform originalTransform = g2d.getTransform();
+        AffineTransform originalScreenTransform = g2d.getTransform();
 
         g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -227,69 +244,123 @@ public class PlayingState implements GameState {
         g2d.setColor(new Color(10, 10, 20));
         g2d.fillRect(0, 0, Game.DEFAULT_WIDTH, Game.DEFAULT_HEIGHT);
 
-        AffineTransform worldTransform = new AffineTransform();
-        if (lander != null && currentZoom != 1.0f) {
-            double landerScreenX = lander.getX() - cameraX;
-            double landerScreenY = lander.getY();
+        Graphics2D worldG = (Graphics2D) g2d.create();
 
-            worldTransform.translate(landerScreenX, landerScreenY);
-            worldTransform.scale(currentZoom, currentZoom);
-            worldTransform.translate(-landerScreenX, -landerScreenY);
+        if (lander != null && currentZoom != 1.0f) {
+            double landerScreenXForZoomPivot = lander.getX() - cameraX;
+            double landerScreenYForZoomPivot = lander.getY();
+
+            AffineTransform zoomTransform = new AffineTransform();
+            zoomTransform.translate(landerScreenXForZoomPivot, landerScreenYForZoomPivot);
+            zoomTransform.scale(currentZoom, currentZoom);
+            zoomTransform.translate(-landerScreenXForZoomPivot, -landerScreenYForZoomPivot);
+            worldG.transform(zoomTransform);
         }
 
-        worldTransform.translate(-cameraX, 0);
-
-        AffineTransform g2dOriginalForWorld = g2d.getTransform();
-        g2d.transform(worldTransform);
+        worldG.translate(-cameraX, 0);
 
         if (terrain != null) {
-            Graphics2D terrainGraphics = (Graphics2D) g.create();
-            terrainGraphics.setTransform(originalTransform);
-
+            Graphics2D terrainSpecificG = (Graphics2D) g2d.create();
             if (lander != null && currentZoom != 1.0f) {
                 double landerScreenX = lander.getX() - cameraX;
                 double landerScreenY = lander.getY();
-                AffineTransform terrainZoom = new AffineTransform();
-                terrainZoom.translate(landerScreenX, landerScreenY);
-                terrainZoom.scale(currentZoom, currentZoom);
-                terrainZoom.translate(-landerScreenX, -landerScreenY);
-                terrainGraphics.transform(terrainZoom);
+                terrainSpecificG.translate(landerScreenX, landerScreenY);
+                terrainSpecificG.scale(currentZoom, currentZoom);
+                terrainSpecificG.translate(-landerScreenX, -landerScreenY);
             }
-            terrain.render(terrainGraphics);
-            terrainGraphics.dispose();
+            terrain.render(terrainSpecificG);
+            terrainSpecificG.dispose();
         }
 
         if (lander != null) {
-            lander.render(g2d);
+            Graphics2D landerSpecificG = (Graphics2D) g2d.create();
+
+            if (currentZoom != 1.0f) {
+                double landerScreenX = lander.getX() - cameraX;
+                double landerScreenY = lander.getY();
+                landerSpecificG.translate(landerScreenX, landerScreenY);
+                landerSpecificG.scale(currentZoom, currentZoom);
+                landerSpecificG.translate(-landerScreenX, -landerScreenY);
+            }
+            landerSpecificG.translate(-cameraX, 0);
+
+            lander.render(landerSpecificG);
+            landerSpecificG.dispose();
         }
+        worldG.dispose();
 
-        g2d.setTransform(originalTransform);
+        g2d.setTransform(originalScreenTransform);
 
+        g2d.setFont(HUD_FONT);
         g2d.setColor(Color.WHITE);
-        g2d.setFont(new Font("Monospaced", Font.BOLD, 16));
+
+        int hudLX = HUD_MARGIN_X;
+        int hudLY = HUD_MARGIN_Y + HUD_FONT.getSize();
         if (lander != null) {
-            g2d.drawString(String.format("Lander X:%.0f Y:%.0f V_X:%.1f V_Y:%.1f Angle:%.0f", lander.getX(), lander.getY(), lander.getVx(), lander.getVy(), Math.toDegrees(lander.getAngle())), 10, 20);
-            g2d.drawString(String.format("Zoom:%.2fx Palivo:%.0f Stav: %s CamX:%.0f", currentZoom, lander.getFuel(), lander.getCurrentState(), cameraX), 10, 40);
+            g2d.drawString("SKÓRE: " + (attemptConcluded ? lander.getCalculatedScore() : "0"), hudLX, hudLY);
+        } else {
+            g2d.drawString("SKÓRE: ---", hudLX, hudLY);
         }
-        g2d.drawString("SKÓRE: " + (attemptConcluded && lander != null ? lander.getCalculatedScore() : "---"), Game.DEFAULT_WIDTH - 150, 20);
+        hudLY += HUD_LINE_SPACING;
+
+        long timeValSeconds = (long) totalTimePlayedInStateSeconds;
+        String timeFormatted = String.format("%02d:%02d", timeValSeconds / 60, timeValSeconds % 60);
+        g2d.drawString("ČAS: " + timeFormatted, hudLX, hudLY);
+        hudLY += HUD_LINE_SPACING;
+
+        if (lander != null) {
+            g2d.drawString(String.format("PALIVO: %.0f", lander.getFuel()), hudLX, hudLY);
+        } else {
+            g2d.drawString("PALIVO: ---", hudLX, hudLY);
+        }
+
+        int hudRX = Game.DEFAULT_WIDTH - HUD_MARGIN_X;
+        hudLY = HUD_MARGIN_Y + HUD_FONT.getSize();
+
+        String heightString = "VÝŠKA: N/A";
+        if (lander != null && (lander.getCurrentState() == Lander.State.PLAYER_CONTROL || lander.getCurrentState() == Lander.State.INITIAL_FLYOVER) && currentHeightAboveTerrain != Float.POSITIVE_INFINITY) {
+            heightString = String.format("VÝŠKA: %.0fpx", currentHeightAboveTerrain);
+        }
+        int textWidth = g2d.getFontMetrics(HUD_FONT).stringWidth(heightString);
+        g2d.drawString(heightString, hudRX - textWidth, hudLY);
+        hudLY += HUD_LINE_SPACING;
+
+        if (lander != null) {
+            String horSpeedText = String.format("HOR.RYCHL: %.1f", lander.getVx());
+            textWidth = g2d.getFontMetrics(HUD_FONT).stringWidth(horSpeedText);
+            g2d.drawString(horSpeedText, hudRX - textWidth, hudLY);
+            hudLY += HUD_LINE_SPACING;
+
+            String verSpeedText = String.format("VER.RYCHL: %.1f", lander.getVy());
+            textWidth = g2d.getFontMetrics(HUD_FONT).stringWidth(verSpeedText);
+            g2d.drawString(verSpeedText, hudRX - textWidth, hudLY);
+        } else {
+            String na = "N/A";
+            textWidth = g2d.getFontMetrics(HUD_FONT).stringWidth("HOR.RYCHL: " + na);
+            g2d.drawString("HOR.RYCHL: " + na, hudRX - textWidth, hudLY);
+            hudLY += HUD_LINE_SPACING;
+            textWidth = g2d.getFontMetrics(HUD_FONT).stringWidth("VER.RYCHL: " + na);
+            g2d.drawString("VER.RYCHL: " + na, hudRX - textWidth, hudLY);
+        }
 
         if (attemptConcluded) {
-            g2d.setFont(new Font("Arial", Font.BOLD, 40));
-            FontMetrics fm = g2d.getFontMetrics();
-            int textWidth = fm.stringWidth(landingMessageDisplay);
+            FontMetrics fm;
             g2d.setColor(Color.YELLOW);
+            g2d.setFont(GAME_OVER_FONT_BIG);
+            fm = g2d.getFontMetrics();
+            textWidth = fm.stringWidth(landingMessageDisplay);
             g2d.drawString(landingMessageDisplay, (Game.DEFAULT_WIDTH - textWidth) / 2, Game.DEFAULT_HEIGHT / 2 - 60);
 
             if (lander != null && lander.getCurrentState() != Lander.State.CRASHED) {
                 String scoreText = "Body: " + lander.getCalculatedScore();
-                g2d.setFont(new Font("Arial", Font.BOLD, 32));
+                g2d.setFont(GAME_OVER_FONT_MEDIUM);
                 fm = g2d.getFontMetrics();
                 textWidth = fm.stringWidth(scoreText);
                 g2d.setColor(Color.GREEN);
                 g2d.drawString(scoreText, (Game.DEFAULT_WIDTH - textWidth) / 2, Game.DEFAULT_HEIGHT / 2 - 10);
             }
 
-            g2d.setFont(new Font("Arial", Font.PLAIN, 20));
+            g2d.setFont(GAME_OVER_FONT_SMALL);
             fm = g2d.getFontMetrics();
             String continueMsg;
             if (lander != null && (lander.getCurrentState() == Lander.State.LANDED_GENTLE || lander.getCurrentState() == Lander.State.LANDED_HARD) && lander.getFuel() > 0) {
@@ -300,20 +371,6 @@ public class PlayingState implements GameState {
             textWidth = fm.stringWidth(continueMsg);
             g2d.setColor(Color.LIGHT_GRAY);
             g2d.drawString(continueMsg, (Game.DEFAULT_WIDTH - textWidth) / 2, Game.DEFAULT_HEIGHT / 2 + 40);
-        }
-
-        KeyBindings kb = inputHandler.getKeyBindings();
-        if (kb != null && !attemptConcluded) {
-            g2d.setFont(new Font("Monospaced", Font.PLAIN, 10));
-            g2d.setColor(new Color(200, 200, 200, 180));
-            int yPos = Game.DEFAULT_HEIGHT - 45;
-            g2d.drawString("Ovládání:", 10, yPos);
-            yPos += 12;
-            g2d.drawString(" Tah: " + kb.getKeyTextForAction(GameAction.THRUST), 10, yPos);
-            yPos += 12;
-            g2d.drawString(" Vlevo: " + kb.getKeyTextForAction(GameAction.ROTATE_LEFT), 10, yPos);
-            yPos += 12;
-            g2d.drawString(" Vpravo: " + kb.getKeyTextForAction(GameAction.ROTATE_RIGHT), 10, yPos);
         }
     }
 
