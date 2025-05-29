@@ -69,7 +69,7 @@ public class Lander {
 
     public Lander(float startX, float startY) {
         try {
-            landerImage = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/image_dc65d1.png")));
+            landerImage = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/pictures/ship.png")));
         } catch (IOException | NullPointerException e) {
             System.err.println("Chyba při načítání obrázku landeru: " + e.getMessage() + ". Použije se záložní tvar.");
             landerImage = null;
@@ -355,7 +355,7 @@ public class Lander {
             dynamicFlame.addPoint((int) flameBaseHalfWidth, (int) flameBaseY);
             dynamicFlame.addPoint(0, (int) (flameBaseY + flameTipLength));
 
-            g.setColor(Color.ORANGE);
+            g.setColor(Color.WHITE);
             g.drawPolygon(dynamicFlame);
         }
         g.setTransform(oldTransform);
