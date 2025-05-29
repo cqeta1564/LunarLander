@@ -304,12 +304,12 @@ public class PlayingState implements GameState {
         hudLY += HUD_LINE_SPACING;
 
         if (lander != null) {
-            String horSpeedText = String.format("HOR.RYCHL: %.1f", lander.getVx());
+            String horSpeedText = String.format("HOR.RYCHL: %.0f", lander.getVx());
             textWidth = g2d.getFontMetrics(HUD_FONT).stringWidth(horSpeedText);
             g2d.drawString(horSpeedText, hudRX - textWidth, hudLY);
             hudLY += HUD_LINE_SPACING;
 
-            String verSpeedText = String.format("VER.RYCHL: %.1f", lander.getVy());
+            String verSpeedText = String.format("VER.RYCHL: %.0f", lander.getVy());
             textWidth = g2d.getFontMetrics(HUD_FONT).stringWidth(verSpeedText);
             g2d.drawString(verSpeedText, hudRX - textWidth, hudLY);
         } else {
