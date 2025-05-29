@@ -396,6 +396,18 @@ public class Lander {
         this.fuel = Math.max(0, Math.min(fuelAmount, MAX_FUEL));
     }
 
+    public void setVyPublic(double v) {
+        this.vy = v;
+    }
+
+    public void setVxPublic(double v) {
+        this.vx = v;
+    }
+
+    public void setAnglePublic(double v) {
+        this.angle = v;
+    }
+
     public enum State {
         INITIAL_FLYOVER, PLAYER_CONTROL, LANDED_GENTLE, LANDED_HARD, CRASHED
     }

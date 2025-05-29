@@ -111,4 +111,24 @@ public class Slider {
     public boolean isDragging() {
         return dragging;
     }
+
+    public int getX() {
+        return x;
+    }
+
+    public int getY() {
+        return y;
+    }
+
+    public int getHeightProp() {
+        return height;
+    }
+
+    public int getKnobHeight() {
+        return knobHeight;
+    }
+
+    public int getWidthProp() {
+        return width;
+    }
 }
