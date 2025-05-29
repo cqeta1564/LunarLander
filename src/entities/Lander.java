@@ -26,7 +26,6 @@ public class Lander {
     private static final int ORIGINAL_LANDER_IMAGE_HEIGHT = 31;
 
     private static final double IMAGE_SCALE_DIVISOR = 1.2;
-    // Změna viditelnosti na public
     public static final int DISPLAY_LANDER_WIDTH = (int) (ORIGINAL_LANDER_IMAGE_WIDTH / IMAGE_SCALE_DIVISOR);
     public static final int DISPLAY_LANDER_HEIGHT = (int) (ORIGINAL_LANDER_IMAGE_HEIGHT / IMAGE_SCALE_DIVISOR);
     private static final double LANDING_GEAR_Y_OFFSET = DISPLAY_LANDER_HEIGHT / 2.0;
@@ -53,6 +52,7 @@ public class Lander {
     private int rotationDirection = 0;
 
     private BufferedImage landerImage;
+
     public Lander(float startX, float startY) {
         try {
             landerImage = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/pictures/ship.png")));
@@ -244,7 +244,7 @@ public class Lander {
             dynamicFlame.addPoint((int) flameBaseHalfWidth, (int) flameBaseY);
             dynamicFlame.addPoint(0, (int) (flameBaseY + flameTipLength));
 
-            g.setColor(new Color(255, 255, 255, 255)); // Plná oranžová pro obrys
+            g.setColor(new Color(255, 255, 255, 255));
             g.drawPolygon(dynamicFlame);
         }
         g.setTransform(oldTransform);
