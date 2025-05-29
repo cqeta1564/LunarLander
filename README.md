@@ -1,0 +1,1 @@
+Old and probably not working version of the game made a really early stage of the development. It was easier to start over than to fix it.
