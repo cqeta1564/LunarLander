@@ -6,34 +6,41 @@ import java.awt.geom.AffineTransform;
 import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 public class Lander {
     public static final double INITIAL_FLYOVER_SPEED_X_PIXELS_S = 60;
     public static final float INITIAL_FLYOVER_START_Y_RATIO = 0.15f;
-
+    public static final int ORIGINAL_LANDER_IMAGE_WIDTH = 36;
+    public static final int ORIGINAL_LANDER_IMAGE_HEIGHT = 31;
+    public static final double MAX_FUEL = 1000.0;
     private static final double PIXELS_PER_METER = 20.0;
     private static final double LUNAR_GRAVITY_MS2 = 1.625;
     private static final double LUNAR_GRAVITY_PIXELS_S2 = LUNAR_GRAVITY_MS2 * PIXELS_PER_METER;
-
     private static final double MAIN_THRUSTER_ACCELERATION_MS2 = 3.0;
     private static final double MAIN_THRUSTER_MAX_ACCELERATION_PIXELS_S2 = MAIN_THRUSTER_ACCELERATION_MS2 * PIXELS_PER_METER;
-
     private static final double ROTATION_DEGREES_PER_SECOND = 90.0;
     private static final double ROTATION_RADIANS_PER_SECOND = Math.toRadians(ROTATION_DEGREES_PER_SECOND);
-
-    private static final int ORIGINAL_LANDER_IMAGE_WIDTH = 36;
-    private static final int ORIGINAL_LANDER_IMAGE_HEIGHT = 31;
-
     private static final double IMAGE_SCALE_DIVISOR = 1.2;
     public static final int DISPLAY_LANDER_WIDTH = (int) (ORIGINAL_LANDER_IMAGE_WIDTH / IMAGE_SCALE_DIVISOR);
     public static final int DISPLAY_LANDER_HEIGHT = (int) (ORIGINAL_LANDER_IMAGE_HEIGHT / IMAGE_SCALE_DIVISOR);
+
     private static final double LANDING_GEAR_Y_OFFSET = DISPLAY_LANDER_HEIGHT / 2.0;
-    private static final double MAX_LANDING_SPEED_Y_PIXELS_S = 40;
-    private static final double MAX_LANDING_SPEED_X_PIXELS_S = 30;
-    private static final double MAX_LANDING_ANGLE_DEGREES = 8.0;
-    private static final double MAX_LANDING_ANGLE_RADIANS = Math.toRadians(MAX_LANDING_ANGLE_DEGREES);
     private static final double LANDING_GEAR_WIDTH_FACTOR = 0.7;
+
+    private static final double CRASH_LIMIT_SPEED_Y = 45.0;
+    private static final double CRASH_LIMIT_SPEED_X = 35.0;
+    private static final double CRASH_LIMIT_ANGLE_DEG = 10.0;
+
+    private static final double PERFECT_LANDING_SPEED_Y = 5.0;
+    private static final double PERFECT_LANDING_SPEED_X = 5.0;
+    private static final double PERFECT_LANDING_ANGLE_DEG = 1.0;
+
+    private static final int MAX_BASE_SCORE_FOR_QUALITY_1 = 30;
+    private static final int MIN_SCORE_FOR_SUCCESSFUL_LANDING = 10;
+    private static final int MAX_SCORE_OVERALL_CAP = 50;
 
     private static final double THRUSTER_RAMP_UP_PER_SECOND = 0.75;
     private static final double THRUSTER_RAMP_DOWN_PER_SECOND = 1.5;
@@ -41,27 +48,33 @@ public class Lander {
     private static final int FLAME_MIN_LENGTH = 5;
     private static final int FLAME_MAX_LENGTH = 20;
     private static final double FLAME_BASE_WIDTH_RATIO = 0.6;
-    private final Point2D.Double[] collisionPointsLocal;
+    private static final double FUEL_CONSUMPTION_RATE_PER_SECOND_AT_FULL_THRUST = 50.0;
+    private static final double FUEL_PENALTY_CRASH_BASE = 100.0;
+    private static final double FUEL_PENALTY_CRASH_VELOCITY_FACTOR = 1.5;
+    public static boolean DEBUG_INFINITE_TOLERANCE_LANDING = false;
+    private final Point2D.Double[] collisionPointsLocalFeet;
+    private final Point2D.Double collisionPointLocalTip;
     private State currentState;
-
+    private int calculatedScore = 0;
+    private double fuel;
     private double x, y;
     private double vx, vy;
     private double angle;
     private boolean playerRequestsThrust = false;
     private double currentThrustOutput = 0.0;
     private int rotationDirection = 0;
-
     private BufferedImage landerImage;
 
     public Lander(float startX, float startY) {
         try {
-            landerImage = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/pictures/ship.png")));
+            landerImage = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/image_dc65d1.png")));
         } catch (IOException | NullPointerException e) {
             System.err.println("Chyba při načítání obrázku landeru: " + e.getMessage() + ". Použije se záložní tvar.");
             landerImage = null;
         }
 
-        collisionPointsLocal = new Point2D.Double[]{new Point2D.Double(-DISPLAY_LANDER_WIDTH / 2.0 * LANDING_GEAR_WIDTH_FACTOR, LANDING_GEAR_Y_OFFSET), new Point2D.Double(DISPLAY_LANDER_WIDTH / 2.0 * LANDING_GEAR_WIDTH_FACTOR, LANDING_GEAR_Y_OFFSET)};
+        collisionPointsLocalFeet = new Point2D.Double[]{new Point2D.Double(-DISPLAY_LANDER_WIDTH / 2.0 * LANDING_GEAR_WIDTH_FACTOR, LANDING_GEAR_Y_OFFSET), new Point2D.Double(DISPLAY_LANDER_WIDTH / 2.0 * LANDING_GEAR_WIDTH_FACTOR, LANDING_GEAR_Y_OFFSET)};
+        collisionPointLocalTip = new Point2D.Double(0, -DISPLAY_LANDER_HEIGHT / 2.0);
         reset(startX, startY);
     }
 
@@ -75,6 +88,8 @@ public class Lander {
         this.playerRequestsThrust = false;
         this.currentThrustOutput = 0.0;
         this.rotationDirection = 0;
+        this.calculatedScore = 0;
+        this.fuel = MAX_FUEL;
     }
 
     public void playerHasTakenControl() {
@@ -100,7 +115,7 @@ public class Lander {
     }
 
     public void update(double deltaTime, Terrain terrain) {
-        if (currentState == State.LANDED || currentState == State.CRASHED) {
+        if (currentState == State.LANDED_GENTLE || currentState == State.LANDED_HARD || currentState == State.CRASHED) {
             vx = 0;
             vy = 0;
             currentThrustOutput = 0.0;
@@ -109,21 +124,31 @@ public class Lander {
             return;
         }
 
-        if (playerRequestsThrust) {
+        if (playerRequestsThrust && fuel > 0) {
             currentThrustOutput += THRUSTER_RAMP_UP_PER_SECOND * deltaTime;
             if (currentThrustOutput > 1.0) currentThrustOutput = 1.0;
-        } else {
+        } else { // Hráč nechce tah NEBO došlo palivo
             currentThrustOutput -= THRUSTER_RAMP_DOWN_PER_SECOND * deltaTime;
             if (currentThrustOutput < 0.0) currentThrustOutput = 0.0;
+            if (fuel <= 0) playerRequestsThrust = false;
         }
+
+        if (currentThrustOutput > 0 && fuel > 0) {
+            fuel -= FUEL_CONSUMPTION_RATE_PER_SECOND_AT_FULL_THRUST * currentThrustOutput * deltaTime;
+            if (fuel < 0) {
+                fuel = 0;
+                currentThrustOutput = 0;
+                playerRequestsThrust = false;
+                System.out.println("PALIVO DOŠLO!");
+            }
+        }
+
 
         double ax = 0;
         double ay = 0;
 
         if (currentState == State.INITIAL_FLYOVER) {
             ay += LUNAR_GRAVITY_PIXELS_S2;
-            if (terrain != null && x > terrain.getScreenWidth() + DISPLAY_LANDER_WIDTH * 2) {
-            }
         } else if (currentState == State.PLAYER_CONTROL) {
             ay += LUNAR_GRAVITY_PIXELS_S2;
             if (currentThrustOutput > 0) {
@@ -146,59 +171,100 @@ public class Lander {
     }
 
     private Point2D.Double getPointInWorldSpace(Point2D.Double localPoint) {
-        double worldX = x + (localPoint.x * Math.cos(angle) - localPoint.y * Math.sin(angle));
-        double worldY = y + (localPoint.x * Math.sin(angle) + localPoint.y * Math.cos(angle));
+        double c = Math.cos(angle);
+        double s = Math.sin(angle);
+        double worldX = x + (localPoint.x * c - localPoint.y * s);
+        double worldY = y + (localPoint.x * s + localPoint.y * c);
         return new Point2D.Double(worldX, worldY);
     }
 
     private void checkCollisions(Terrain terrain) {
-        if (terrain == null || currentState == State.LANDED || currentState == State.CRASHED) return;
+        if (terrain == null || currentState != State.PLAYER_CONTROL) {
+            if (currentState == State.INITIAL_FLYOVER && y > terrain.getScreenHeight() + DISPLAY_LANDER_HEIGHT) {
+                currentState = State.CRASHED;
+                calculatedScore = 0;
+            }
+            return;
+        }
 
         Polygon terrainPolygon = terrain.getTerrainPolygon();
-        boolean collisionDetected = false;
+        boolean anyPointInTerrainPolygon = false;
 
-        for (Point2D.Double localP : collisionPointsLocal) {
-            Point2D.Double worldP = getPointInWorldSpace(localP);
+        List<Point2D.Double> allCollisionPoints = new ArrayList<>();
+        for (Point2D.Double localP : collisionPointsLocalFeet) {
+            allCollisionPoints.add(getPointInWorldSpace(localP));
+        }
+        allCollisionPoints.add(getPointInWorldSpace(collisionPointLocalTip));
+
+        for (Point2D.Double worldP : allCollisionPoints) {
             if (terrainPolygon.contains(worldP)) {
-                collisionDetected = true;
+                anyPointInTerrainPolygon = true;
                 break;
             }
         }
-        Point2D.Double tipWorld = getPointInWorldSpace(new Point2D.Double(0, -DISPLAY_LANDER_HEIGHT / 2.0));
-        if (!collisionDetected && terrainPolygon.contains(tipWorld)) {
-            collisionDetected = true;
-        }
 
-        if (collisionDetected) {
-            boolean onSafePad = false;
-            int currentMultiplier = 0;
+        if (anyPointInTerrainPolygon) {
+            double impactVx = this.vx;
+            double impactVy = this.vy;
+
+            LandingPad contactPad = null;
             for (LandingPad pad : terrain.getLandingPads()) {
-                Point2D.Double worldFootLeft = getPointInWorldSpace(collisionPointsLocal[0]);
-                Point2D.Double worldFootRight = getPointInWorldSpace(collisionPointsLocal[1]);
-                boolean leftFootOnPadX = worldFootLeft.x >= pad.getStartX() && worldFootLeft.x <= pad.getEndX();
-                boolean rightFootOnPadX = worldFootRight.x >= pad.getStartX() && worldFootRight.x <= pad.getEndX();
-                boolean yAlignment = Math.abs(worldFootLeft.y - pad.getY()) < 5 && Math.abs(worldFootRight.y - pad.getY()) < 5;
-
-                if (leftFootOnPadX && rightFootOnPadX && yAlignment) {
-                    boolean safeSpeedY = Math.abs(vy) <= MAX_LANDING_SPEED_Y_PIXELS_S;
-                    boolean safeSpeedX = Math.abs(vx) <= MAX_LANDING_SPEED_X_PIXELS_S;
-                    double angleDegrees = (Math.toDegrees(angle) % 360 + 360) % 360;
-                    boolean safeAngle = (angleDegrees <= MAX_LANDING_ANGLE_DEGREES || angleDegrees >= (360 - MAX_LANDING_ANGLE_DEGREES));
-
-                    if (safeSpeedY && safeSpeedX && safeAngle) {
-                        onSafePad = true;
-                        currentMultiplier = pad.getMultiplier();
-                        this.y = pad.getY() - LANDING_GEAR_Y_OFFSET;
-                        this.angle = 0;
-                        break;
-                    } else {
-                        onSafePad = false;
+                boolean padContactFound = false;
+                for (Point2D.Double worldP : allCollisionPoints) {
+                    boolean xMatch = worldP.x >= pad.getStartX() && worldP.x <= pad.getEndX();
+                    double yTolerance = DEBUG_INFINITE_TOLERANCE_LANDING ? DISPLAY_LANDER_HEIGHT : DISPLAY_LANDER_HEIGHT * 0.5;
+                    boolean yMatch = Math.abs(worldP.y - pad.getY()) < yTolerance;
+                    if (xMatch && yMatch) {
+                        contactPad = pad;
+                        padContactFound = true;
                         break;
                     }
                 }
+                if (padContactFound) break;
             }
-            if (onSafePad) currentState = State.LANDED;
-            else currentState = State.CRASHED;
+
+            double currentAngleDeg = (Math.toDegrees(this.angle % (2 * Math.PI)) + 360) % 360;
+            if (currentAngleDeg > 180) currentAngleDeg -= 360;
+            double absAngleDeg = Math.abs(currentAngleDeg);
+            double absVx = Math.abs(impactVx);
+            double absVy = Math.abs(impactVy);
+
+            if (DEBUG_INFINITE_TOLERANCE_LANDING && contactPad != null) {
+                currentState = State.LANDED_GENTLE;
+                calculatedScore = Math.min(MAX_BASE_SCORE_FOR_QUALITY_1 * contactPad.getMultiplier(), MAX_SCORE_OVERALL_CAP);
+                this.y = contactPad.getY() - LANDING_GEAR_Y_OFFSET;
+                this.angle = 0;
+            } else if (absAngleDeg > CRASH_LIMIT_ANGLE_DEG || absVx > CRASH_LIMIT_SPEED_X || absVy > CRASH_LIMIT_SPEED_Y) {
+                currentState = State.CRASHED;
+                calculatedScore = 0;
+                double impactSpeed = Math.sqrt(impactVx * impactVx + impactVy * impactVy);
+                fuel -= (FUEL_PENALTY_CRASH_BASE + impactSpeed * FUEL_PENALTY_CRASH_VELOCITY_FACTOR);
+                if (fuel < 0) fuel = 0;
+            } else {
+                this.angle = 0;
+                float qualityVy = 1.0f - (float) Math.max(0, (absVy - PERFECT_LANDING_SPEED_Y) / (CRASH_LIMIT_SPEED_Y - PERFECT_LANDING_SPEED_Y));
+                qualityVy = Math.max(0, Math.min(1, qualityVy));
+                float qualityVx = 1.0f - (float) Math.max(0, (absVx - PERFECT_LANDING_SPEED_X) / (CRASH_LIMIT_SPEED_X - PERFECT_LANDING_SPEED_X));
+                qualityVx = Math.max(0, Math.min(1, qualityVx));
+                float qualityAngle = 1.0f - (float) Math.max(0, (absAngleDeg - PERFECT_LANDING_ANGLE_DEG) / (CRASH_LIMIT_ANGLE_DEG - PERFECT_LANDING_ANGLE_DEG));
+                qualityAngle = Math.max(0, Math.min(1, qualityAngle));
+                float overallQuality = (qualityVy + qualityVx + qualityAngle) / 3.0f;
+                float baseScore = overallQuality * MAX_BASE_SCORE_FOR_QUALITY_1;
+                int multiplier = (contactPad != null) ? contactPad.getMultiplier() : 1;
+                int finalScore = Math.round(baseScore * multiplier);
+                finalScore = Math.max(MIN_SCORE_FOR_SUCCESSFUL_LANDING, finalScore);
+                finalScore = Math.min(finalScore, MAX_SCORE_OVERALL_CAP);
+                this.calculatedScore = finalScore;
+
+                if (contactPad != null) {
+                    this.y = contactPad.getY() - LANDING_GEAR_Y_OFFSET;
+                }
+                if (this.calculatedScore >= (MIN_SCORE_FOR_SUCCESSFUL_LANDING + (MAX_SCORE_OVERALL_CAP - MIN_SCORE_FOR_SUCCESSFUL_LANDING) * 0.6f)) {
+                    currentState = State.LANDED_GENTLE;
+                } else {
+                    currentState = State.LANDED_HARD;
+                }
+            }
 
             vx = 0;
             vy = 0;
@@ -213,16 +279,20 @@ public class Lander {
         g.translate(x, y);
         g.rotate(angle);
 
+        Color baseColor = Color.CYAN;
+        if (currentState == State.CRASHED) baseColor = Color.RED;
+        else if (currentState == State.LANDED_GENTLE || currentState == State.LANDED_HARD) baseColor = Color.GREEN;
+
         if (landerImage != null) {
             int imgX = -DISPLAY_LANDER_WIDTH / 2;
             int imgY = -DISPLAY_LANDER_HEIGHT / 2;
             g.drawImage(landerImage, imgX, imgY, DISPLAY_LANDER_WIDTH, DISPLAY_LANDER_HEIGHT, null);
+            if (currentState == State.CRASHED || currentState == State.LANDED_GENTLE || currentState == State.LANDED_HARD) {
+                g.setColor(new Color(baseColor.getRed(), baseColor.getGreen(), baseColor.getBlue(), 70));
+                g.fillRect(imgX, imgY, DISPLAY_LANDER_WIDTH, DISPLAY_LANDER_HEIGHT);
+            }
         } else {
-            Color fallbackColor;
-            if (currentState == State.CRASHED) fallbackColor = Color.RED;
-            else if (currentState == State.LANDED) fallbackColor = Color.GREEN;
-            else fallbackColor = Color.CYAN;
-            g.setColor(fallbackColor);
+            g.setColor(baseColor);
             Polygon fallbackShape = new Polygon();
             fallbackShape.addPoint(0, -DISPLAY_LANDER_HEIGHT / 2);
             fallbackShape.addPoint(-DISPLAY_LANDER_WIDTH / 2, DISPLAY_LANDER_HEIGHT / 2);
@@ -244,7 +314,7 @@ public class Lander {
             dynamicFlame.addPoint((int) flameBaseHalfWidth, (int) flameBaseY);
             dynamicFlame.addPoint(0, (int) (flameBaseY + flameTipLength));
 
-            g.setColor(new Color(255, 255, 255, 255));
+            g.setColor(Color.ORANGE);
             g.drawPolygon(dynamicFlame);
         }
         g.setTransform(oldTransform);
@@ -258,11 +328,31 @@ public class Lander {
         return y;
     }
 
+    public double getVx() {
+        return vx;
+    }
+
+    public double getVy() {
+        return vy;
+    }
+
+    public double getAngle() {
+        return angle;
+    }
+
     public State getCurrentState() {
         return currentState;
-    } // Nyní je State public
+    }
+
+    public int getCalculatedScore() {
+        return calculatedScore;
+    }
+
+    public double getFuel() {
+        return fuel;
+    }
 
     public enum State {
-        INITIAL_FLYOVER, PLAYER_CONTROL, LANDED, CRASHED
+        INITIAL_FLYOVER, PLAYER_CONTROL, LANDED_GENTLE, LANDED_HARD, CRASHED
     }
 }
