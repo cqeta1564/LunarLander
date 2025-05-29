@@ -13,7 +13,6 @@ import java.awt.geom.Point2D;
 import java.util.List;
 
 public class PlayingState implements GameState {
-
     private static final float SCROLL_THRESHOLD_RIGHT_FACTOR = 0.7f;
     private static final float LANDER_SCREEN_TARGET_X_AFTER_SCROLL = 0.6f;
     private static final float CAMERA_SCROLL_LERP_SPEED = 4.0f;
@@ -43,6 +42,7 @@ public class PlayingState implements GameState {
     private double totalTimePlayedInStateSeconds = 0;
     private float currentHeightAboveTerrain = 0;
     private double fuelForNextAttempt = Lander.MAX_FUEL;
+    private int cumulativeSessionScore = 0;
 
     public PlayingState(StateManager stateManager, InputHandler inputHandler) {
         this.stateManager = stateManager;
@@ -68,14 +68,18 @@ public class PlayingState implements GameState {
         float startY = Game.DEFAULT_HEIGHT * Lander.INITIAL_FLYOVER_START_Y_RATIO;
         float startX = this.cameraX - Lander.DISPLAY_LANDER_WIDTH;
 
+        double fuelValueForThisNewAttempt = fuelForNextAttempt;
+
         if (this.lander == null) {
             this.lander = new Lander(startX, startY);
-            this.lander.setFuel(fuelForNextAttempt);
         } else {
             lander.reset(startX, startY);
-            lander.setFuel(fuelForNextAttempt);
         }
+        this.lander.setFuel(fuelValueForThisNewAttempt);
 
+        if (fuelValueForThisNewAttempt == Lander.MAX_FUEL) {
+            cumulativeSessionScore = 0;
+        }
         fuelForNextAttempt = Lander.MAX_FUEL;
 
         playerControlTakenSinceEnter = false;
@@ -121,7 +125,6 @@ public class PlayingState implements GameState {
                 }
             }
         }
-
         if (Math.abs(targetCameraX - cameraX) > 0.5f) {
             cameraX += (targetCameraX - cameraX) * CAMERA_SCROLL_LERP_SPEED * deltaTime;
         } else if (targetCameraX != cameraX) {
@@ -189,37 +192,23 @@ public class PlayingState implements GameState {
     }
 
     private void checkLanderStatusAndScore() {
-        if (lander == null || attemptConcluded) return;
+        if (lander == null) return;
+        if (attemptConcluded) return;
+
         Lander.State lState = lander.getCurrentState();
-        if (lState == Lander.State.LANDED_GENTLE || lState == Lander.State.LANDED_HARD || lState == Lander.State.CRASHED) {
+
+        if (lState == Lander.State.LANDED_GENTLE || lState == Lander.State.LANDED_HARD) {
+            cumulativeSessionScore += lander.getCalculatedScore();
             attemptConcluded = true;
-            switch (lState) {
-                case LANDED_GENTLE:
-                    landingMessageDisplay = "Perfektní přistání!";
-                    if (lander.getFuel() <= 0) {
-                        landingMessageDisplay += " .. ale došlo palivo!";
-                    }
-                    break;
-                case LANDED_HARD:
-                    landingMessageDisplay = "Tvrdé přistání!";
-                    if (lander.getFuel() <= 0) {
-                        landingMessageDisplay += " .. ale došlo palivo!";
-                    }
-                    break;
-                case CRASHED:
-                    landingMessageDisplay = "Havárie!";
-                    // Pokud po havárii dojde palivo, tato zpráva se zobrazí
-                    // a následně se zobrazí pouze možnost "ESC pro menu", protože lander.getFuel() <= 0
-                    if (lander.getFuel() <= 0) {
-                        landingMessageDisplay += " .. a palivo také došlo!";
-                    }
-                    break;
-                default:
-                    landingMessageDisplay = "Pokus ukončen.";
-                    if (lander.getFuel() <= 0) {
-                        landingMessageDisplay += " .. palivo došlo.";
-                    }
-                    break;
+            landingMessageDisplay = (lState == Lander.State.LANDED_GENTLE) ? "Perfektní přistání!" : "Tvrdé přistání!";
+            if (lander.getFuel() <= 0) {
+                landingMessageDisplay += " .. ale došlo palivo!";
+            }
+        } else if (lState == Lander.State.CRASHED) {
+            attemptConcluded = true;
+            landingMessageDisplay = "Havárie!";
+            if (lander.getFuel() <= 0) {
+                landingMessageDisplay += " .. a palivo také došlo!";
             }
         }
     }
@@ -287,11 +276,9 @@ public class PlayingState implements GameState {
 
         int hudLX = HUD_MARGIN_X;
         int hudLY = HUD_MARGIN_Y + HUD_FONT.getSize();
-        if (lander != null) {
-            g2d.drawString("SKÓRE: " + (attemptConcluded ? lander.getCalculatedScore() : "0"), hudLX, hudLY);
-        } else {
-            g2d.drawString("SKÓRE: ---", hudLX, hudLY);
-        }
+
+
+        g2d.drawString("SKÓRE: " + cumulativeSessionScore, hudLX, hudLY);
         hudLY += HUD_LINE_SPACING;
 
         long timeValSeconds = (long) totalTimePlayedInStateSeconds;
